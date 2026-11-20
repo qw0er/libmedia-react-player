@@ -1,0 +1,23 @@
+@reference "tailwindcss";
+
+.libmedia-player-viewport {
+  @apply relative aspect-video bg-black;
+}
+
+.libmedia-player-play {
+  @apply cursor-pointer rounded-md border-neutral-600 bg-neutral-800 text-neutral-100 hover:bg-neutral-700 focus-visible:outline-offset-2 focus-visible:outline-white;
+  border-style: solid;
+  border-width: 1px;
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  font: inherit;
+}
+
+.libmedia-player-play:focus-visible {
+  outline-style: solid;
+  outline-width: 2px;
+}
+
+.libmedia-player-message {
+  margin: 1rem 0 0;
+}

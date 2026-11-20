@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@source not "../vendor/libmedia";
+
+@layer base {
+  body {
+    @apply scheme-dark bg-neutral-900 font-sans text-neutral-100;
+  }
+}

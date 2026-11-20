@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": ".",
+    "outDir": "./dist"
+  },
+  "include": ["src/LibmediaPlayer.tsx", "src/bundled-player.d.ts"]
+}
