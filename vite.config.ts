@@ -27,7 +27,7 @@ export default defineConfig(({ command }) => {
           formats: ['es'],
         },
         rolldownOptions: {
-          external: [/^react(?:\/|$)/],
+          external: [/^react(?:\/|$)/, 'lucide-react'],
         },
       },
     }

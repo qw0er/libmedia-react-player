@@ -1,6 +1,6 @@
 # libmedia-react-player
 
-A React player for Matroska (MKV) built on libmedia AVPlayer. The first release will provide chapter navigation, audio and subtitle track selection, a subtitle Off option, and a WebAssembly SIMD software decoding fallback. Anishelf is the first intended consumer.
+A React player for Matroska (MKV) built on libmedia AVPlayer. The player provides chapter navigation, audio and subtitle track selection, a subtitle Off option, and a WebAssembly SIMD software decoding fallback. Anishelf is the first intended consumer.
 
 The project is in early development. The local demo uses the same `LibmediaPlayer` component exported by the package. See the [v0.1 requirements](docs/requirements.md) for the planned controls.
 
@@ -36,6 +36,27 @@ export default function App() {
   return <LibmediaPlayer src="/media/sample.mkv" />
 }
 ```
+
+The control layout follows the player's own width. On wide players, use the bottom control bar. On narrow players, tap the picture to show playback controls and open Settings at the upper right. Click or tap the time display when it has a chevron to open the chapter list.
+
+Use **CC** to toggle the current subtitle track. Settings also lets you select audio and subtitle tracks, adjust subtitle timing, and set playback speed. To load supported external text subtitles, pass an array of distinct subtitle URLs.
+
+```tsx
+export function PlayerWithSubtitles() {
+  return (
+    <LibmediaPlayer
+      src="/media/sample.mkv"
+      externalSubtitles={[
+        { src: '/media/sample.en.srt', label: 'English', language: 'en' },
+      ]}
+    />
+  )
+}
+```
+
+With libmedia 1.3.1, seeking into the final cue of an external SRT can leave that cue undisplayed. The cue can appear during continuous playback.
+
+With the player region focused, use **Space** or **K** for play and pause, **Left** and **Right** to seek five seconds, **M** to mute, **C** to toggle subtitles, and **F** for fullscreen. Use **Escape** to close an open player menu.
 
 The npm package includes the AVPlayer runtime and 37 SIMD WASM modules. The component loads the runtime when mounted and imports the WASM modules needed for playback. A standard application build follows those imports, so the default setup requires only a browser-accessible media URL.
 
