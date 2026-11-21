@@ -1,6 +1,6 @@
 # libmedia-react-player
 
-A multi-format React media player with responsive controls, chapter navigation, audio and subtitle track selection, and a bundled WebAssembly SIMD decoding fallback. Built on libmedia AVPlayer 1.3.1.
+A multi-format React media player with responsive controls, chapter navigation, audio and subtitle track selection, and a bundled WebAssembly SIMD decoding fallback. Built on the libmedia AVPlayer fork pinned by the Git submodule.
 
 ## Quick start
 
@@ -133,12 +133,12 @@ See [TypeScript definitions](src/player-api.ts) for full signatures.
 
 ## Runtime and deployment
 
-| Scenario                      | Requirements                                                                                                                                                                                                         |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Basic playback                | React 19, WebAssembly SIMD, and a browser-accessible media URL                                                                                                                                                       |
-| Software playback             | WebGL and Web Audio                                                                                                                                                                                                  |
-| Styled subtitles              | Workers and OffscreenCanvas. Deploy the bundled subtitle Worker alongside the other built assets                                                                                                                     |
-| Content Security Policy (CSP) | Allow `blob:` in `script-src` and `worker-src`, and `'wasm-unsafe-eval'` in `script-src`. Allow the media origin in `connect-src`, `blob:` in `media-src` for MSE, and `data:` in `connect-src` for styled subtitles |
+| Scenario                      | Requirements                                                                                                                                                                                                                |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Basic playback                | React 19, WebAssembly SIMD, and a browser-accessible media URL                                                                                                                                                              |
+| Software playback             | WebGL and Web Audio                                                                                                                                                                                                         |
+| Styled subtitles              | Workers and OffscreenCanvas. Workers and assets are emitted by the app build. Styled subtitles also require `blob:` in `script-src` for the JASSUB Worker                                                                   |
+| Content Security Policy (CSP) | Allow same-origin scripts and `'wasm-unsafe-eval'` in `script-src`, and `blob:` in `worker-src`. Allow the media origin in `connect-src`, `blob:` in `media-src` for MSE, and `data:` in `connect-src` for styled subtitles |
 
 For multithreaded WASM, serve the page with these headers and permit cross-origin resources through CORS or CORP as applicable. Check `window.crossOriginIsolated` to confirm.
 
@@ -153,16 +153,23 @@ Use Node.js 22.13+ in the 22.x series or Node.js 24+. Place a video in `.temp/` 
 
 ```sh
 npm ci
+npm run setup:libmedia
 npm run dev
 ```
 
-| Command         | Purpose                                         |
-| --------------- | ----------------------------------------------- |
-| `npm run check` | Biome and TypeScript checks                     |
-| `npm run build` | Build the library and declarations into `dist/` |
+| Command                  | Purpose                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| `npm run build:libmedia` | Rebuild the AVPlayer runtime, audio worklets, and declarations from the checked-out fork |
+| `npm run check`          | Biome and TypeScript checks                                                              |
+| `npm run build`          | Build the library and declarations into `dist/`                                          |
+
+The submodule pins the source of both the browser runtime and TypeScript declarations.
+Run `npm run setup:libmedia` on a fresh checkout. Run `npm run build:libmedia`
+after editing the fork locally. The React package includes the built assets,
+so package consumers can install it without checking out the submodule.
 
 ## License
 
 - Project code — [LGPL-3.0-or-later](LICENSE)
-- Bundled AVPlayer and SIMD decoders — [upstream libmedia 1.3.1 assets](https://github.com/zhaohappy/libmedia/tree/152f629d3021fd8013efa464fcb7b55f9fbe7753/dist)
+- Bundled AVPlayer and SIMD decoders — [libmedia fork pinned in `deps/libmedia`](https://github.com/qw0er/libmedia)
 - Bundled JASSUB — upstream license in `dist/JASSUB-LICENSE`

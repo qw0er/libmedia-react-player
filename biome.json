@@ -10,7 +10,7 @@
       "**",
       "!!**/dist",
       "!!**/dist-ssr",
-      "!!vendor/libmedia",
+      "!!deps/libmedia",
       "!package-lock.json",
       "!**/*.svg"
     ]

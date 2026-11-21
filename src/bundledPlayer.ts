@@ -1,66 +1,27 @@
-import playerSource from 'virtual:libmedia-player-source'
-import subtitleSource from 'virtual:libmedia-subtitle-source'
+import type AVPlayer from '@qw0er/libmedia-avplayer'
+import messagePort from '../deps/libmedia/packages/avplayer/dist/browser/AudioSourceWorkletProcessor.js?url&no-inline'
+import sharedMemory from '../deps/libmedia/packages/avplayer/dist/browser/AudioSourceWorkletProcessor2.js?url&no-inline'
+import playerUrl from '../deps/libmedia/packages/avplayer/dist/browser/avplayer.js?url&no-inline'
 
-type UpstreamModule = typeof import('@libmedia/avplayer/AVPlayer')
-type UpstreamPlayer = InstanceType<UpstreamModule['default']>
-type UpstreamOptions = ConstructorParameters<UpstreamModule['default']>[0]
-type StreamSelector = NonNullable<UpstreamOptions['findBestStream']>
+export type BundledPlayer = AVPlayer
 
-// The Vite adapter adds session cancellation and exposes the demux seek result.
-export type BundledPlayer = Omit<
-  UpstreamPlayer,
-  'load' | 'loadExternalSubtitle' | 'seek'
-> & {
-  load(
-    source: Parameters<UpstreamPlayer['load']>[0],
-    options?: NonNullable<Parameters<UpstreamPlayer['load']>[1]> & {
-      signal?: AbortSignal
-    },
-  ): ReturnType<UpstreamPlayer['load']>
-  loadExternalSubtitle(
-    track: Parameters<UpstreamPlayer['loadExternalSubtitle']>[0],
-    signal?: AbortSignal,
-    deadline?: AbortSignal,
-  ): ReturnType<UpstreamPlayer['loadExternalSubtitle']>
-  seek(timestamp: bigint): Promise<bigint | null | undefined>
-}
-type PlayerModule = Omit<UpstreamModule, 'default'> & {
-  default: new (
-    options: Omit<UpstreamOptions, 'findBestStream'> & {
-      findBestStream?: (
-        ...args: Parameters<StreamSelector>
-      ) => ReturnType<StreamSelector> | undefined
-    },
-  ) => BundledPlayer
-}
-type BundledPlayerModule = PlayerModule & {
-  setLibmediaWasmLoader(loader: typeof loadWasm): void
-}
+type PlayerModule = typeof import('@qw0er/libmedia-avplayer')
+type PlayerOptions = ConstructorParameters<PlayerModule['default']>[0]
 
-const chunks = import.meta.glob<string>(
-  [
-    '../vendor/libmedia/player/*.avplayer.js',
-    '!../vendor/libmedia/player/630.avplayer.js',
-  ],
-  {
-    eager: true,
-    import: 'default',
-    query: '?raw',
-  },
-)
-const wasmDirectory = '../vendor/libmedia/wasm'
+const wasmDirectory = '../deps/libmedia/dist'
 const wasmFiles = import.meta.glob<string>(
-  '../vendor/libmedia/wasm/*/*-simd.wasm',
-  {
-    import: 'default',
-    query: '?url&inline',
-  },
+  [
+    '../deps/libmedia/dist/decode/*-simd.wasm',
+    '../deps/libmedia/dist/resample/*-simd.wasm',
+    '../deps/libmedia/dist/stretchpitch/*-simd.wasm',
+  ],
+  { import: 'default', query: '?url&inline' },
 )
 
-async function loadWasm(path: string | null): Promise<ArrayBuffer | undefined> {
+const getWasm: PlayerOptions['getWasm'] = async (_, __, ___, path) => {
   if (!path) return
 
-  const loadFile = wasmFiles[`${wasmDirectory}${path}`]
+  const loadFile = wasmFiles[wasmDirectory + path]
   if (!loadFile) throw new Error(`Missing bundled libmedia WASM: ${path}`)
 
   const dataUrl = await loadFile()
@@ -68,52 +29,17 @@ async function loadWasm(path: string | null): Promise<ArrayBuffer | undefined> {
   return Uint8Array.from(bytes, (byte) => byte.charCodeAt(0)).buffer
 }
 
+export const runtimeOptions = {
+  audioWorkletUrls: { messagePort, sharedMemory },
+  getWasm,
+} satisfies Partial<PlayerOptions>
+
 let runtime: Promise<PlayerModule> | undefined
 
 export function loadBundledPlayer(): Promise<PlayerModule> {
-  runtime ??= importPlayer().catch((error: unknown) => {
+  runtime ??= import(/* @vite-ignore */ playerUrl).catch((error: unknown) => {
     runtime = undefined
     throw error
   })
   return runtime
-}
-
-async function importPlayer(): Promise<PlayerModule> {
-  const chunkUrls = Object.fromEntries(
-    Object.entries(chunks).map(([path, source]) => {
-      const id = path.slice(path.lastIndexOf('/') + 1, -'.avplayer.js'.length)
-      return [
-        id,
-        URL.createObjectURL(new Blob([source], { type: 'text/javascript' })),
-      ]
-    }),
-  )
-  chunkUrls['630'] = URL.createObjectURL(
-    new Blob([subtitleSource], { type: 'text/javascript' }),
-  )
-  const entry = URL.createObjectURL(
-    new Blob(
-      [
-        `const libmediaChunkUrls = ${JSON.stringify(chunkUrls)};
-let libmediaLoadWasm;
-export function setLibmediaWasmLoader(loader) { libmediaLoadWasm = loader; }
-`,
-        playerSource,
-      ],
-      { type: 'text/javascript' },
-    ),
-  )
-
-  try {
-    const module: BundledPlayerModule = await import(
-      /* @vite-ignore */ /* webpackIgnore: true */ entry
-    )
-    module.setLibmediaWasmLoader(loadWasm)
-    return module
-  } catch (error) {
-    for (const url of Object.values(chunkUrls)) URL.revokeObjectURL(url)
-    throw error
-  } finally {
-    URL.revokeObjectURL(entry)
-  }
 }

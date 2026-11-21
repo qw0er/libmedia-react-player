@@ -3,7 +3,6 @@ import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { bundledPlayer } from './vite/bundled-player.ts'
 
 const isolationHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -15,7 +14,6 @@ export default defineConfig(({ command }) => {
     react(),
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
-    bundledPlayer(),
   ]
   if (command === 'build') {
     return {

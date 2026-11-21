@@ -238,7 +238,7 @@ export function usePlayback(
       seeking: false,
     })
     const loading = import('./bundledPlayer')
-      .then(async ({ loadBundledPlayer }) => {
+      .then(async ({ loadBundledPlayer, runtimeOptions }) => {
         if (!active) return
         const { default: AVPlayer, AVPlayerSupportedCodecs } =
           await loadBundledPlayer()
@@ -251,6 +251,7 @@ export function usePlayback(
         let subtitleOffset = 0
         const sidecars = new Map<number, ExternalSubtitleTrack>()
         const instance = new AVPlayer({
+          ...runtimeOptions,
           container,
           findBestStream(streams, mediaType) {
             // AVMediaType.Audio. Other stream types use the engine's default.

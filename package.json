@@ -13,6 +13,8 @@
   ],
   "type": "module",
   "scripts": {
+    "setup:libmedia": "git submodule update --init --recursive && npm --prefix deps/libmedia ci --ignore-scripts && npm run build:libmedia",
+    "build:libmedia": "npm --prefix deps/libmedia run build-avplayer-browser",
     "dev": "vite",
     "build": "vite build && tsc -p tsconfig.lib.json",
     "format": "biome format --write .",
@@ -22,7 +24,6 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@libmedia/avplayer": "1.3.1",
     "lucide-react": "^1.77.0",
     "sirv": "^3.0.2"
   },
@@ -46,6 +47,9 @@
   },
   "files": [
     "dist",
+    "!dist/src/**",
+    "dist/src/LibmediaPlayer.d.ts",
+    "dist/src/player-api.d.ts",
     "COPYING"
   ],
   "types": "./dist/src/LibmediaPlayer.d.ts",

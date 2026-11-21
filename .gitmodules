@@ -1,0 +1,4 @@
+[submodule "deps/libmedia"]
+	path = deps/libmedia
+	url = https://github.com/qw0er/libmedia.git
+	branch = hotfix

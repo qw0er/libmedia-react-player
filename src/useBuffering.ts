@@ -1,9 +1,8 @@
 import { type RefObject, useEffect, useState } from 'react'
 
-type Player = Pick<
-  import('@libmedia/avplayer/AVPlayer').default,
-  'currentTime' | 'isMSE'
->
+import type { BundledPlayer } from './bundledPlayer'
+
+type Player = Pick<BundledPlayer, 'currentTime' | 'isMSE'>
 
 export interface BufferedRange {
   start: number

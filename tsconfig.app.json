@@ -1,4 +1,5 @@
 {
+  "extends": "./deps/libmedia/packages/avplayer/dist/browser-types/tsconfig.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "es2023",
