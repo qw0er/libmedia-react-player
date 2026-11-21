@@ -19,6 +19,7 @@ type Stream = ReturnType<Player['getStreams']>[number]
 type Operation = LibmediaPlayerError['operation']
 
 const progressIntervalMs = 1000
+const sidecarTimeoutMs = 8000
 // The range input can round its rightmost position down by up to one step.
 const endSeekToleranceMs = 100
 
@@ -108,6 +109,7 @@ export type PlaybackState = ReturnType<typeof usePlayback>
 
 interface Session {
   player: Player
+  signal: AbortSignal
   active: boolean
   status: LibmediaPlaybackStatus
   media?: MediaInfo
@@ -143,7 +145,6 @@ export function usePlayback(
   externalSubtitles: readonly ExternalSubtitleTrack[],
   initialPositionMs: number | undefined,
   initialAudio: LibmediaAudioSelection | undefined,
-  teardown: React.RefObject<Promise<void>>,
   events: LibmediaPlayerEvents,
 ) {
   const viewport = useRef<HTMLDivElement>(null)
@@ -181,6 +182,8 @@ export function usePlayback(
     if (!container) return
 
     let active = true
+    const lifetime = new AbortController()
+    const { signal } = lifetime
     let observer: ResizeObserver | undefined
     let current: Session | undefined
     let positionMs = 0
@@ -234,10 +237,9 @@ export function usePlayback(
       playbackRate: 1,
       seeking: false,
     })
-    const loading = teardown.current
-      .then(async () => {
+    const loading = import('./bundledPlayer')
+      .then(async ({ loadBundledPlayer }) => {
         if (!active) return
-        const { loadBundledPlayer } = await import('./bundledPlayer')
         const { default: AVPlayer, AVPlayerSupportedCodecs } =
           await loadBundledPlayer()
         if (!active) return
@@ -259,6 +261,7 @@ export function usePlayback(
         let selection: TrackSelection | undefined
         const playback: Session = {
           player: instance,
+          signal,
           active,
           status: 'loading',
           lastVolume: 1,
@@ -504,23 +507,32 @@ export function usePlayback(
         await instance.load(new URL(src, document.baseURI).href, {
           ext: sourceFormat,
           http: mediaRequest,
+          signal,
         })
+        let sidecarDeadline: AbortSignal | undefined
         for (const [index, track] of externalSubtitles.entries()) {
           if (!active || playback.status === 'error') return
           const { src, content, format, label, language } = track
           const count = instance.getStreams().length
           try {
-            await instance.loadExternalSubtitle({
-              source:
-                content === undefined
-                  ? new URL(src, document.baseURI).href
-                  : new File(
-                      [content],
-                      `subtitle-${index}.${track.renderer === 'styled' ? 'ass' : format.trim().replace(/^\./, '').toLowerCase()}`,
-                    ),
-              title: label,
-              lang: language,
-            })
+            if (content === undefined) {
+              sidecarDeadline ??= AbortSignal.timeout(sidecarTimeoutMs)
+            }
+            await instance.loadExternalSubtitle(
+              {
+                source:
+                  content === undefined
+                    ? new URL(src, document.baseURI).href
+                    : new File(
+                        [content],
+                        `subtitle-${index}.${track.renderer === 'styled' ? 'ass' : format.trim().replace(/^\./, '').toLowerCase()}`,
+                      ),
+                title: label,
+                lang: language,
+              },
+              signal,
+              content === undefined ? sidecarDeadline : undefined,
+            )
           } catch {
             playback.reportError(
               'track',
@@ -604,7 +616,12 @@ export function usePlayback(
         current.player.setVolume(0, true)
       }
       session.current = null
-      teardown.current = Promise.allSettled([loading, current?.operation])
+      lifetime.abort(
+        new DOMException('The playback session was replaced.', 'AbortError'),
+      )
+      // AVPlayer may still be unwinding a Worker call. Destroy only this
+      // instance when it settles, independently of the replacement session.
+      void Promise.allSettled([loading, current?.operation])
         .then(() => current?.player.destroy())
         .catch(() => {})
     }
@@ -615,7 +632,6 @@ export function usePlayback(
     externalSubtitles,
     initialPositionMs,
     initialAudio,
-    teardown,
   ])
 
   const commands = useMemo(() => {
@@ -637,16 +653,14 @@ export function usePlayback(
 
       setBusy(true)
       setNotice('')
-      const aborted = () =>
-        new DOMException('The playback session was replaced.', 'AbortError')
       const result = (async () => {
         try {
           const value = await action(current)
-          if (!current.active) throw aborted()
+          current.signal.throwIfAborted()
           if (current.status === 'error') throw new Error(message)
           return value
         } catch {
-          if (!current.active) throw aborted()
+          current.signal.throwIfAborted()
           current.reportError(operation, message, fatal)
           throw new Error(message)
         } finally {
@@ -658,7 +672,14 @@ export function usePlayback(
         }
       })()
       current.operation = result
-      return result
+      return new Promise((resolve, reject) => {
+        const { signal } = current
+        const abort = () => reject(signal.reason)
+        signal.addEventListener('abort', abort, { once: true })
+        void result.then(resolve, reject).finally(() => {
+          signal.removeEventListener('abort', abort)
+        })
+      })
     }
 
     const controls: LibmediaPlayerHandle = {

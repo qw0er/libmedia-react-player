@@ -6,8 +6,22 @@ type UpstreamPlayer = InstanceType<UpstreamModule['default']>
 type UpstreamOptions = ConstructorParameters<UpstreamModule['default']>[0]
 type StreamSelector = NonNullable<UpstreamOptions['findBestStream']>
 
-// The Vite adapter preserves AVPlayer's defaults and exposes the demux seek result.
-export type BundledPlayer = Omit<UpstreamPlayer, 'seek'> & {
+// The Vite adapter adds session cancellation and exposes the demux seek result.
+export type BundledPlayer = Omit<
+  UpstreamPlayer,
+  'load' | 'loadExternalSubtitle' | 'seek'
+> & {
+  load(
+    source: Parameters<UpstreamPlayer['load']>[0],
+    options?: NonNullable<Parameters<UpstreamPlayer['load']>[1]> & {
+      signal?: AbortSignal
+    },
+  ): ReturnType<UpstreamPlayer['load']>
+  loadExternalSubtitle(
+    track: Parameters<UpstreamPlayer['loadExternalSubtitle']>[0],
+    signal?: AbortSignal,
+    deadline?: AbortSignal,
+  ): ReturnType<UpstreamPlayer['loadExternalSubtitle']>
   seek(timestamp: bigint): Promise<bigint | null | undefined>
 }
 type PlayerModule = Omit<UpstreamModule, 'default'> & {

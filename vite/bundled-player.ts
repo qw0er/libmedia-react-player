@@ -91,6 +91,81 @@ export function bundledPlayer(): Plugin {
           'if(!this.reader&&(await this.openReader(),this.aborted))return-1048576;',
           'if(!this.reader){await this.openReader();if(this.aborted)return-1048576;if(!this.reader)return-1048573;}',
         ],
+        // Abort format probing on the main thread. Keep the signal out of the
+        // serialized HTTP options sent to the Worker.
+        [
+          'l=await async function(e){let t=arguments.length>1&&void 0!==arguments[1]?arguments[1]:{};',
+          'l=await async function(e,t,signal){',
+        ],
+        [
+          'r=new AbortController,i.signal=r.signal);const s=await fetch(e,i);',
+          'r=new AbortController,i.signal=r.signal);if(signal)i.signal=signal;const s=await fetch(e,i);',
+        ],
+        [
+          'if(r&&r.abort(),t.length){const e=t.length>1?',
+          'if(signal){void e.cancel().catch(()=>{})}else r?.abort();if(t.length){const e=t.length>1?',
+        ],
+        ['}(e,c));let p=0;"wss"', '}(e,c,arguments[3]));let p=0;"wss"'],
+        [
+          'let{info:a,type:o,ext:n}=await(0,ie.A)(e,t.ext,t.http);this.ext=n,',
+          'let{info:a,type:o,ext:n}=await(0,ie.A)(e,t.ext,t.http,t.signal);t.signal?.throwIfAborted();if(o===0)this.cancelFetchOnAbort(this.taskId,t.signal);this.ext=n,',
+        ],
+        // Route each abort to its own FetchIOLoader, including a sidecar that
+        // has registered its IO task but has yet to finish demuxing.
+        [
+          'async loadExternalSubtitle(e){',
+          'cancelFetchOnAbort(taskId,signal){const cancel=()=>{void Le.IOThread.cancelFetch(taskId).catch(()=>{})};signal?.addEventListener("abort",cancel,{once:true});return cancel}async loadExternalSubtitle(e,signal,deadline){signal?.throwIfAborted();deadline?.throwIfAborted();',
+        ],
+        [
+          'let a="",o=0,n=0;w.Yj(e.source)?',
+          'const cancel=w.Yj(e.source)?this.cancelFetchOnAbort(t,signal):undefined;if(cancel)deadline?.addEventListener("abort",cancel,{once:true});try{let a="",o=0,n=0;w.Yj(e.source)?',
+        ],
+        [
+          'const d=h.streams[0];this.formatContext.streams.push(d)',
+          'signal?.throwIfAborted();deadline?.throwIfAborted();if(cancel)deadline?.removeEventListener("abort",cancel);const d=h.streams[0];this.formatContext.streams.push(d)',
+        ],
+        [
+          'this.externalSubtitleTasks.push(r),this.fire(Ae.STREAM_UPDATE),0}async load(e)',
+          'this.externalSubtitleTasks.push(r),this.fire(Ae.STREAM_UPDATE),0}finally{if(cancel)deadline?.removeEventListener("abort",cancel);if(r.streamId===-1){if(cancel)signal?.removeEventListener("abort",cancel);await Le.DemuxerThread.unregisterTask(t);await Le.IOThread.unregisterTask(t)}}}async load(e)',
+        ],
+        [
+          'async getDuration(e){const t=this.tasks.get(e);if(t)return 4===t.type',
+          'async cancelFetch(taskId){this.tasks.get(taskId)?.ioLoader.cancelFetch?.()}async getDuration(e){const t=this.tasks.get(e);if(t)return 4===t.type',
+        ],
+        // Cancel requests waiting for headers as well as reads of an open
+        // response. Cancellation is permanent for this task, even across seek.
+        [
+          'async getTotalSize(e){var t,i,r;',
+          'cancelFetch(){this.fetchCancelled=true;this.abortSleep();this.abortController?.abort()}async getTotalSize(e){if(this.fetchCancelled)return 0;var t,i,r;',
+        ],
+        [
+          'var i;if(this.info=e,this.range=t,this.range.to',
+          'var i;if(this.fetchCancelled)return -1048576;if(this.info=e,this.range=t,this.range.to',
+        ],
+        [
+          'return this.status=2,0}getBandwidthReader(e,t)',
+          'return this.fetchCancelled?-1048576:(this.status=2,0)}getBandwidthReader(e,t)',
+        ],
+        [
+          'i=0;for(;this.buffers.length&&i<e.length;)',
+          'i=0;if(this.fetchCancelled)return -1048576;for(;this.buffers.length&&i<e.length;)',
+        ],
+        [
+          'const{value:r,done:s}=await this.reader.read();return s?',
+          'let chunk;try{chunk=await this.reader.read()}catch(error){if(this.fetchCancelled)return -1048576;throw error}const{value:r,done:s}=chunk;if(this.fetchCancelled)return -1048576;return s?',
+        ],
+        [
+          'catch(e){if(this.retryCount<this.options.retryCount&&(!this.options.isLive||!this.receivedLength))',
+          'catch(e){if(this.fetchCancelled)return;if(this.retryCount<this.options.retryCount&&(!this.options.isLive||!this.receivedLength))',
+        ],
+        [
+          'return this.supportRange?this.eofIndex>0&&Number(e)>this.eofIndex?a.nr:(await this.abort(),this.aborted=!1',
+          'if(this.fetchCancelled)return -1048576;return this.supportRange?this.eofIndex>0&&Number(e)>this.eofIndex?a.nr:(await this.abort(),this.fetchCancelled?-1048576:(this.aborted=!1',
+        ],
+        [
+          '4===this.status&&(this.status=2),0):a.NU}',
+          '4===this.status&&(this.status=2),0)):a.NU}',
+        ],
         // Surface failed demux seeks after the engine has released its seek state.
         [
           'this.subtitleRender&&(this.subtitleRender.reset(),this.subtitleRender.start())}async seek(e)',

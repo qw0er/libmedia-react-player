@@ -48,7 +48,6 @@ export function LibmediaPlayer({
   labels,
   ...props
 }: LibmediaPlayerProps) {
-  const teardown = useRef(Promise.resolve())
   const format =
     sourceFormat?.trim().replace(/^\./, '').toLowerCase() || undefined
   const headers = Object.entries(mediaRequest?.headers ?? {}).sort(([a], [b]) =>
@@ -91,7 +90,6 @@ export function LibmediaPlayer({
         sourceFormat={format}
         mediaRequest={mediaRequest}
         externalSubtitles={externalSubtitles}
-        teardown={teardown}
       />
     </PlayerLabels>
   )
@@ -108,11 +106,8 @@ function Playback({
   style,
   onNextEpisode,
   ref,
-  teardown,
   ...events
-}: LibmediaPlayerProps & {
-  teardown: React.RefObject<Promise<void>>
-}) {
+}: LibmediaPlayerProps) {
   const [subtitleSources] = useState(() => externalSubtitles)
   const [request] = useState(() =>
     mediaRequest
@@ -132,7 +127,6 @@ function Playback({
     subtitleSources,
     initialPosition,
     audio,
-    teardown,
     events,
   )
   const { controls } = playback
