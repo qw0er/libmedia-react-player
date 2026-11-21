@@ -6,6 +6,11 @@ export interface ExternalSubtitleTrack {
   language?: string
 }
 
+export interface LibmediaRequestOptions {
+  headers?: Readonly<Record<string, string>>
+  credentials?: RequestCredentials
+}
+
 export type LibmediaPlaybackStatus =
   | 'loading'
   | 'ready'
@@ -61,6 +66,8 @@ export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   src: string
   /** Media format as a file extension, such as `mkv`, for URLs without one. */
   sourceFormat?: string
+  /** HTTP options for requests made for the media source. */
+  mediaRequest?: LibmediaRequestOptions
   externalSubtitles?: readonly ExternalSubtitleTrack[]
   /** Applied once when the source loads. Use seekTo to change position later. */
   initialPositionMs?: number

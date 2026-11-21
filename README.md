@@ -64,6 +64,7 @@ With libmedia 1.3.1, seeking into the final cue of an external SRT can leave tha
 | ----------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `src`                   | `string`                                    | Required media URL.                                                                                                             |
 | `sourceFormat`          | `string`                                    | Optional file extension to pass to AVPlayer. For example, use `sourceFormat="mkv"` with `src="/api/media/123"`.                 |
+| `mediaRequest`          | `LibmediaRequestOptions`                    | Optional headers and Fetch credentials mode for media requests, including byte-range requests.                                  |
 | `externalSubtitles`     | `readonly ExternalSubtitleTrack[]`          | External subtitle tracks. Each has a required `src` and optional `label` and `language`.                                        |
 | `initialPositionMs`     | `number`                                    | Starting position in milliseconds, applied when the source loads.                                                               |
 | `ref`                   | `Ref<LibmediaPlayerHandle>`                 | Access to playback commands.                                                                                                    |
@@ -75,6 +76,22 @@ With libmedia 1.3.1, seeking into the final cue of an external SRT can leave tha
 | `onError`               | `(event: LibmediaPlayerError) => void`      | Reports the failed operation, a display-safe message, and whether the error is fatal.                                           |
 
 All event payloads include `src`. Progress events include `positionMs` and `durationMs`; duration is `null` when unknown or live. `onSeeked` also includes `requestedPositionMs`. Callbacks from an earlier session are invalidated when the source changes. The component exports these event types, `LibmediaPlayerProps`, `ExternalSubtitleTrack`, and `LibmediaPlayerHandle`.
+
+### Authenticated media
+
+```tsx
+;<LibmediaPlayer
+  src="/api/media/123"
+  sourceFormat="mkv"
+  mediaRequest={{ headers: { Authorization: `Bearer ${accessToken}` } }}
+/>
+```
+
+For cross-origin cookie authentication, set `mediaRequest={{ credentials: 'include' }}` and configure the media server for credentialed CORS. Custom headers such as `Authorization` must be allowed by the media server when the request is cross-origin. The options apply to the main media source. External subtitles follow their own URL and browser defaults.
+
+Changing a header or the credentials mode reloads the current source. Recreating an options object with the same values keeps the current playback session.
+
+With AVPlayer 1.3.1, an HTTP 401 during media loading can leave the player in the loading state without firing `onError`.
 
 ### Playback commands
 

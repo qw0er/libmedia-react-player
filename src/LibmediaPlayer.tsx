@@ -23,29 +23,43 @@ export type {
   LibmediaPlayerEvents,
   LibmediaPlayerHandle,
   LibmediaPlayerProps,
+  LibmediaRequestOptions,
   LibmediaSeekEvent,
 } from './player-api'
 
 export function LibmediaPlayer({
   src,
   sourceFormat,
+  mediaRequest,
   externalSubtitles = [],
   ...props
 }: LibmediaPlayerProps) {
   const teardown = useRef(Promise.resolve())
   const format =
     sourceFormat?.trim().replace(/^\./, '').toLowerCase() || undefined
-  const key = JSON.stringify([
+  const headers = Object.entries(mediaRequest?.headers ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b),
+  )
+  const signature = JSON.stringify([
     src,
     format,
     externalSubtitles.map(({ src, label, language }) => [src, label, language]),
+    mediaRequest?.credentials,
+    headers,
   ])
+  // Use a revision as the React key so URLs and credentials stay out of it.
+  const [source, setSource] = useState({ signature, revision: 0 })
+  if (signature !== source.signature) {
+    setSource({ signature, revision: source.revision + 1 })
+  }
+
   return (
     <Playback
-      key={key}
+      key={source.revision}
       {...props}
       src={src}
       sourceFormat={format}
+      mediaRequest={mediaRequest}
       externalSubtitles={externalSubtitles}
       teardown={teardown}
     />
@@ -55,6 +69,7 @@ export function LibmediaPlayer({
 function Playback({
   src,
   sourceFormat,
+  mediaRequest,
   externalSubtitles = [],
   initialPositionMs,
   ref,
@@ -64,10 +79,19 @@ function Playback({
   teardown: React.RefObject<Promise<void>>
 }) {
   const [subtitleSources] = useState(() => externalSubtitles)
+  const [request] = useState(() =>
+    mediaRequest
+      ? {
+          headers: mediaRequest.headers && { ...mediaRequest.headers },
+          credentials: mediaRequest.credentials,
+        }
+      : undefined,
+  )
   const [initialPosition] = useState(initialPositionMs)
   const playback = usePlayback(
     src,
     sourceFormat,
+    request,
     subtitleSources,
     initialPosition,
     teardown,

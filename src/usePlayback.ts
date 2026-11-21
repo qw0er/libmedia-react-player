@@ -7,6 +7,7 @@ import type {
   LibmediaPlayerError,
   LibmediaPlayerEvents,
   LibmediaPlayerHandle,
+  LibmediaRequestOptions,
 } from './player-api'
 import { useBuffering } from './useBuffering'
 
@@ -118,6 +119,7 @@ function seekTarget(media: MediaInfo | undefined, positionMs: number) {
 export function usePlayback(
   src: string,
   sourceFormat: string | undefined,
+  mediaRequest: LibmediaRequestOptions | undefined,
   externalSubtitles: readonly ExternalSubtitleTrack[],
   initialPositionMs: number | undefined,
   teardown: React.RefObject<Promise<void>>,
@@ -308,6 +310,7 @@ export function usePlayback(
 
         await instance.load(new URL(src, document.baseURI).href, {
           ext: sourceFormat,
+          http: mediaRequest,
           externalSubtitles: externalSubtitles.map(
             ({ src, label, language }) => ({
               source: new URL(src, document.baseURI).href,
@@ -357,7 +360,14 @@ export function usePlayback(
         .then(() => current?.player.destroy())
         .catch(() => {})
     }
-  }, [src, sourceFormat, externalSubtitles, initialPositionMs, teardown])
+  }, [
+    src,
+    sourceFormat,
+    mediaRequest,
+    externalSubtitles,
+    initialPositionMs,
+    teardown,
+  ])
 
   const commands = useMemo(() => {
     function run<Result>(
