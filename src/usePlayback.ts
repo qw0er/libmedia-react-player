@@ -8,6 +8,8 @@ import type {
   LibmediaPlayerEvents,
   LibmediaPlayerHandle,
   LibmediaRequestOptions,
+  LibmediaTrack,
+  LibmediaTrackChangeEvent,
 } from './player-api'
 import { useBuffering } from './useBuffering'
 
@@ -19,17 +21,17 @@ const progressIntervalMs = 1000
 // The range input can round its rightmost position down by up to one step.
 const endSeekToleranceMs = 100
 
-interface Track {
-  id: number
-  label: string
-  language?: string
+interface TrackSelection {
+  selectedAudio?: LibmediaTrack
+  selectedSubtitle?: LibmediaTrack
+  captions: boolean
 }
 
 function metadataText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function readTracks(streams: Stream[], fallback: string): Track[] {
+function readTracks(streams: Stream[], fallback: string): LibmediaTrack[] {
   const tracks = streams.map(({ id, metadata }, index) => ({
     id,
     label: metadataText(metadata.title),
@@ -107,6 +109,7 @@ interface Session {
   setStatus: (status: LibmediaPlaybackStatus) => void
   progress: () => LibmediaPlaybackProgress
   updatePosition: (positionMs: number, publication?: 'sample' | 'force') => void
+  syncTracks: (captions?: boolean) => void
   emit: (notify: (events: LibmediaPlayerEvents) => void) => void
   reportError: (operation: Operation, message: string, fatal: boolean) => void
 }
@@ -135,9 +138,7 @@ export function usePlayback(
   const [pendingSeek, setPendingSeek] = useState<number>()
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
-  const [audioId, setAudioId] = useState(-1)
-  const [subtitleId, setSubtitleId] = useState(-1)
-  const [captions, setCaptions] = useState(true)
+  const [tracks, setTracks] = useState<TrackSelection>({ captions: true })
   const [delay, setDelay] = useState(0)
   const [volume, setVolume] = useState(1)
   const [rate, setRate] = useState(1)
@@ -199,6 +200,7 @@ export function usePlayback(
         if (!active) return
 
         const instance = new AVPlayer({ container })
+        let selection: TrackSelection | undefined
         const playback: Session = {
           player: instance,
           active,
@@ -235,6 +237,44 @@ export function usePlayback(
             const progress = playback.progress()
             emit((events) => events.onTimeUpdate?.(progress))
           },
+          syncTracks(captions = selection?.captions ?? true) {
+            if (!active || playback.status === 'error' || !playback.media)
+              return
+            const { audio, subtitles } = playback.media
+            const audioId = instance.getSelectedAudioStreamId()
+            const subtitleId = instance.getSelectedSubtitleStreamId()
+            const selectedAudio = audio.find((track) => track.id === audioId)
+            const selectedSubtitle = subtitles.find(
+              (track) => track.id === subtitleId,
+            )
+            const previous = selection
+            if (
+              previous?.selectedAudio === selectedAudio &&
+              previous?.selectedSubtitle === selectedSubtitle &&
+              previous?.captions === captions
+            )
+              return
+
+            selection = { selectedAudio, selectedSubtitle, captions }
+            setTracks(selection)
+            const visibleSubtitle = captions ? selectedSubtitle : undefined
+            const previousSubtitle = previous?.captions
+              ? previous.selectedSubtitle
+              : undefined
+            if (
+              previous &&
+              previous.selectedAudio === selectedAudio &&
+              previousSubtitle === visibleSubtitle
+            )
+              return
+
+            const event: LibmediaTrackChangeEvent = {
+              src,
+              audio: selectedAudio ? { ...selectedAudio } : null,
+              subtitle: visibleSubtitle ? { ...visibleSubtitle } : null,
+            }
+            emit((events) => events.onTrackChange?.(event))
+          },
           emit,
           reportError(operation, message, fatal) {
             if (!active || playback.status === 'error') return
@@ -247,10 +287,6 @@ export function usePlayback(
         }
         current = playback
 
-        function syncTracks() {
-          setAudioId(instance.getSelectedAudioStreamId())
-          setSubtitleId(instance.getSelectedSubtitleStreamId())
-        }
         instance
           .on('error', () => {
             if (playback.status === 'loading') reportLoadError()
@@ -258,7 +294,7 @@ export function usePlayback(
           })
           .on('played', () => {
             if (!active || playback.status === 'error') return
-            syncTracks()
+            playback.syncTracks()
             playback.setStatus('playing')
           })
           .on('paused', () => {
@@ -302,7 +338,7 @@ export function usePlayback(
             }
           })
           .on('changed', () => {
-            if (active) syncTracks()
+            playback.syncTracks()
           })
           .on('volumeChange', (level) => {
             if (active) setVolume(level)
@@ -507,7 +543,7 @@ export function usePlayback(
   function changeCaptions(enabled: boolean) {
     // Keep libmedia's decoder and cue queue running so toggling visibility
     // never seeks the subtitle stream or resets a cue already in progress.
-    setCaptions(enabled)
+    session.current?.syncTracks(enabled)
   }
 
   function selectTrack(kind: 'audio' | 'subtitles', id: number) {
@@ -517,12 +553,15 @@ export function usePlayback(
       async (current) => {
         const { player } = current
         if (kind === 'audio') {
-          if (id !== audioId) await player.selectAudio(id)
+          if (id !== player.getSelectedAudioStreamId())
+            await player.selectAudio(id)
           if (id !== player.getSelectedAudioStreamId()) throw new Error()
+          current.syncTracks()
         } else {
-          if (id !== subtitleId) await player.selectSubtitle(id)
+          if (id !== player.getSelectedSubtitleStreamId())
+            await player.selectSubtitle(id)
           if (id !== player.getSelectedSubtitleStreamId()) throw new Error()
-          if (current.active) changeCaptions(true)
+          current.syncTracks(true)
         }
       },
     ).catch(() => {})
@@ -538,9 +577,7 @@ export function usePlayback(
     position: pendingSeek ?? position,
     busy,
     notice,
-    selectedAudio: media?.audio.find((track) => track.id === audioId),
-    selectedSubtitle: media?.subtitles.find((track) => track.id === subtitleId),
-    captions,
+    ...tracks,
     delay,
     volume,
     rate,

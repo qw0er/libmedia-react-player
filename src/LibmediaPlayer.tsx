@@ -25,6 +25,8 @@ export type {
   LibmediaPlayerProps,
   LibmediaRequestOptions,
   LibmediaSeekEvent,
+  LibmediaTrack,
+  LibmediaTrackChangeEvent,
 } from './player-api'
 
 export function LibmediaPlayer({

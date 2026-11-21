@@ -37,6 +37,20 @@ export interface LibmediaSeekEvent extends LibmediaPlaybackProgress {
   requestedPositionMs: number
 }
 
+export interface LibmediaTrack {
+  /** AVPlayer stream ID for the current playback session. */
+  id: number
+  label: string
+  language?: string
+}
+
+export interface LibmediaTrackChangeEvent {
+  src: string
+  audio: LibmediaTrack | null
+  /** Null when subtitles are off or no supported track is selected. */
+  subtitle: LibmediaTrack | null
+}
+
 export interface LibmediaPlayerError {
   src: string
   operation: 'load' | 'playback' | 'play' | 'pause' | 'seek' | 'track'
@@ -57,6 +71,8 @@ export interface LibmediaPlayerEvents {
   onTimeUpdate?: (event: LibmediaPlaybackProgress) => void
   onPlaybackStateChange?: (event: LibmediaPlaybackState) => void
   onSeeked?: (event: LibmediaSeekEvent) => void
+  /** Reports the initial selection when playback starts and subsequent changes. */
+  onTrackChange?: (event: LibmediaTrackChangeEvent) => void
   onEnded?: (event: LibmediaPlaybackProgress) => void
   onError?: (event: LibmediaPlayerError) => void
 }

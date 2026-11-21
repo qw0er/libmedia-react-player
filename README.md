@@ -72,10 +72,13 @@ With libmedia 1.3.1, seeking into the final cue of an external SRT can leave tha
 | `onTimeUpdate`          | `(event: LibmediaPlaybackProgress) => void` | Reports progress, generally at most once per second during playback; settled seeks, pauses, and endings can report immediately. |
 | `onPlaybackStateChange` | `(event: LibmediaPlaybackState) => void`    | Reports playback status and buffering state.                                                                                    |
 | `onSeeked`              | `(event: LibmediaSeekEvent) => void`        | Reports the requested and settled positions.                                                                                    |
+| `onTrackChange`         | `(event: LibmediaTrackChangeEvent) => void` | Reports the active audio and subtitle tracks when playback first starts and when either selection changes.                      |
 | `onEnded`               | `(event: LibmediaPlaybackProgress) => void` | Reports the final position after natural playback completion.                                                                   |
 | `onError`               | `(event: LibmediaPlayerError) => void`      | Reports the failed operation, a display-safe message, and whether the error is fatal.                                           |
 
 All event payloads include `src`. Progress events include `positionMs` and `durationMs`; duration is `null` when unknown or live. `onSeeked` also includes `requestedPositionMs`. Callbacks from an earlier session are invalidated when the source changes. The component exports these event types, `LibmediaPlayerProps`, `ExternalSubtitleTrack`, and `LibmediaPlayerHandle`.
+
+`onTrackChange` receives `{ src, audio, subtitle }`. Each active track has an AVPlayer stream ID, a label, and an optional language. Track IDs belong to the current playback session. `audio` is `null` when no audio track is active. `subtitle` is `null` when subtitles are off or no supported subtitle track is active.
 
 ### Authenticated media
 
