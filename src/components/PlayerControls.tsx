@@ -62,6 +62,7 @@ export function PlayerControls({
       {duration > 0 && (
         <Timeline
           chapters={chapters}
+          buffered={playback.buffered}
           duration={duration}
           time={time}
           scrub={scrub}

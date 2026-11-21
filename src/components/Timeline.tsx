@@ -1,9 +1,11 @@
 import { type CSSProperties, useRef, useState } from 'react'
+import type { BufferedRange } from '../useBuffering'
 import type { MediaInfo } from '../usePlayback'
 import { clock, seekStepMs } from './player-ui'
 
 interface TimelineProps {
   chapters: MediaInfo['chapters']
+  buffered: BufferedRange[]
   duration: number
   time: number
   scrub?: number
@@ -13,6 +15,7 @@ interface TimelineProps {
 
 export function Timeline({
   chapters,
+  buffered,
   duration,
   time,
   scrub,
@@ -63,7 +66,8 @@ export function Timeline({
       )}
       <div className="lmp-track" aria-hidden="true">
         {starts.map((start, index) => {
-          const length = (starts[index + 1] ?? duration) - start
+          const end = starts[index + 1] ?? duration
+          const length = end - start
           const fill = Math.min(1, Math.max(0, (time - start) / length))
           return (
             <span
@@ -77,7 +81,25 @@ export function Timeline({
                   '--lmp-segment-fill': `${fill * 100}%`,
                 } as CSSProperties
               }
-            />
+            >
+              <span className="lmp-segment-track">
+                {buffered.map((range) => {
+                  const from = Math.max(start, range.start)
+                  const to = Math.min(end, range.end)
+                  if (from >= to) return null
+                  return (
+                    <span
+                      className="lmp-segment-buffer"
+                      key={range.start}
+                      style={{
+                        left: `${((from - start) / length) * 100}%`,
+                        width: `${((to - from) / length) * 100}%`,
+                      }}
+                    />
+                  )
+                })}
+              </span>
+            </span>
           )
         })}
       </div>

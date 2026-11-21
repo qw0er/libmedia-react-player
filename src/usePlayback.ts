@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useBuffering } from './useBuffering'
 
 type Player = import('@libmedia/avplayer/AVPlayer').default
 type Stream = ReturnType<Player['getStreams']>[number]
@@ -117,6 +118,11 @@ export function usePlayback(
   const [delay, setDelay] = useState(0)
   const [volume, setVolume] = useState(1)
   const [rate, setRate] = useState(1)
+  const { buffered, buffering } = useBuffering(
+    viewport,
+    session,
+    status === 'playing' && pendingSeek === undefined,
+  )
 
   useEffect(() => {
     const container = viewport.current
@@ -287,6 +293,8 @@ export function usePlayback(
     viewport,
     status,
     media,
+    buffered,
+    buffering,
     position: pendingSeek ?? position,
     busy,
     notice,

@@ -131,6 +131,28 @@
   visibility: hidden;
 }
 
+.lmp-spinner {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: calc(clamp(48px, 9cqw, 68px) + 10px);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: 3px solid rgb(255 255 255 / 30%);
+  border-top-color: var(--lmp-accent);
+  border-radius: 50%;
+  translate: -50% -50%;
+  animation: lmp-spin 850ms linear infinite;
+  pointer-events: none;
+}
+
+@keyframes lmp-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
 .lmp-message,
 .lmp-notice {
   position: absolute;
@@ -316,24 +338,32 @@
 }
 
 .lmp-segment,
-.lmp-segment::before {
+.lmp-segment-track,
+.lmp-segment-buffer,
+.lmp-segment-track::after {
   position: absolute;
   inset-block: 0;
 }
 
-.lmp-segment::before {
+.lmp-segment-track {
   --lmp-half-gap: min(1.5px, 12%);
   inset-inline: 0;
   clip-path: inset(
     0 var(--lmp-gap-right, var(--lmp-half-gap)) 0
       var(--lmp-gap-left, var(--lmp-half-gap)) round 3px
   );
+  background: rgb(255 255 255 / 36%);
+}
+
+.lmp-segment-buffer {
+  background: rgb(255 255 255 / 38%);
+}
+
+.lmp-segment-track::after {
+  left: 0;
+  width: var(--lmp-segment-fill);
+  background: var(--lmp-accent);
   content: "";
-  background: linear-gradient(
-    to right,
-    var(--lmp-accent) var(--lmp-segment-fill),
-    rgb(255 255 255 / 36%) var(--lmp-segment-fill)
-  );
 }
 
 .lmp-segment:first-child {
@@ -344,12 +374,12 @@
   --lmp-gap-right: 0px;
 }
 
-.lmp-segment[data-hovered]::before {
+.lmp-segment[data-hovered] .lmp-segment-track {
   transform: scaleY(2);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .lmp-segment::before {
+  .lmp-segment-track {
     transition: transform 140ms ease-out;
   }
 }
