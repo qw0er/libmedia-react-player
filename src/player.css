@@ -312,19 +312,46 @@
 .lmp-track {
   position: relative;
   height: 4px;
-  border-radius: 3px;
+  pointer-events: none;
+}
+
+.lmp-segment,
+.lmp-segment::before {
+  position: absolute;
+  inset-block: 0;
+}
+
+.lmp-segment::before {
+  --lmp-half-gap: min(1.5px, 12%);
+  inset-inline: 0;
+  clip-path: inset(
+    0 var(--lmp-gap-right, var(--lmp-half-gap)) 0
+      var(--lmp-gap-left, var(--lmp-half-gap)) round 3px
+  );
+  content: "";
   background: linear-gradient(
     to right,
-    var(--lmp-accent) var(--lmp-progress),
-    rgb(255 255 255 / 36%) var(--lmp-progress)
+    var(--lmp-accent) var(--lmp-segment-fill),
+    rgb(255 255 255 / 36%) var(--lmp-segment-fill)
   );
 }
 
-.lmp-marker {
-  position: absolute;
-  inset-block: -2px;
-  width: 2px;
-  background: #191b20;
+.lmp-segment:first-child {
+  --lmp-gap-left: 0px;
+}
+
+.lmp-segment:last-child {
+  --lmp-gap-right: 0px;
+}
+
+.lmp-segment[data-hovered]::before {
+  transform: scaleY(2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lmp-segment::before {
+    transition: transform 140ms ease-out;
+  }
 }
 
 .lmp-thumb {
@@ -336,6 +363,7 @@
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--lmp-accent);
+  pointer-events: none;
 }
 
 .lmp-preview {

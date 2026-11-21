@@ -21,11 +21,23 @@ export function Timeline({
 }: TimelineProps) {
   const dragging = useRef(false)
   const [hover, setHover] = useState<number>()
+  const starts = [
+    0,
+    ...new Set(
+      chapters
+        .map((chapter) => chapter.start)
+        .filter((start) => start > 0 && start < duration),
+    ),
+  ]
+  const hoveredStart =
+    hover === undefined ? undefined : starts.findLast((start) => start <= hover)
   const preview = scrub ?? hover
   const previewChapter =
     preview === undefined
       ? undefined
-      : chapters.findLast((chapter) => chapter.start <= preview)
+      : chapters.findLast(
+          (chapter) => chapter.start <= preview && chapter.start < duration,
+        )
   return (
     <div
       className="lmp-timeline"
@@ -50,17 +62,26 @@ export function Timeline({
         </div>
       )}
       <div className="lmp-track" aria-hidden="true">
-        {chapters
-          .filter(({ start }) => start > 0 && start < duration)
-          .map(({ start }, index) => (
+        {starts.map((start, index) => {
+          const length = (starts[index + 1] ?? duration) - start
+          const fill = Math.min(1, Math.max(0, (time - start) / length))
+          return (
             <span
-              className="lmp-marker"
-              key={`${start}-${index}`}
-              style={{ left: `${(start / duration) * 100}%` }}
+              className="lmp-segment"
+              key={start}
+              data-hovered={start === hoveredStart || undefined}
+              style={
+                {
+                  left: `${(start / duration) * 100}%`,
+                  width: `${(length / duration) * 100}%`,
+                  '--lmp-segment-fill': `${fill * 100}%`,
+                } as CSSProperties
+              }
             />
-          ))}
-        <span className="lmp-thumb" />
+          )
+        })}
       </div>
+      <span className="lmp-thumb" aria-hidden="true" />
       <input
         aria-label="Seek"
         aria-valuetext={`${clock(time)} of ${clock(duration)}`}
@@ -71,6 +92,7 @@ export function Timeline({
         value={time}
         onPointerDown={(event) => {
           if (event.button !== 0) return
+          if (event.pointerType !== 'mouse') setHover(undefined)
           dragging.current = true
           event.currentTarget.setPointerCapture(event.pointerId)
           onScrub(Number(event.currentTarget.value))
