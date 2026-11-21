@@ -64,14 +64,6 @@ function Playback({
   const playing = status === 'playing'
   const loaded = media && status !== 'error' && status !== 'starting'
   const visible = !playing || !idle || panelOpen || scrub !== undefined
-  const message =
-    status === 'loading'
-      ? 'Loading video…'
-      : status === 'starting'
-        ? 'Starting playback…'
-        : status === 'error'
-          ? 'Playback failed. Check the video URL and browser compatibility.'
-          : ''
 
   useEffect(() => {
     function updateFullscreen() {
@@ -137,6 +129,7 @@ function Playback({
       // biome-ignore lint/a11y/noNoninteractiveTabindex: Focus scopes shortcuts to this player.
       tabIndex={0}
       aria-label="Video player"
+      aria-busy={status === 'loading' || status === 'starting'}
       className="libmedia-player"
       data-visible={visible}
       data-panel-open={panelOpen}
@@ -216,12 +209,9 @@ function Playback({
         />
       )}
 
-      {message && (
-        <div
-          className="lmp-message"
-          role={status === 'error' ? 'alert' : 'status'}
-        >
-          {message}
+      {status === 'error' && (
+        <div className="lmp-message" role="alert">
+          Playback failed. Check the video URL and browser compatibility.
         </div>
       )}
 
