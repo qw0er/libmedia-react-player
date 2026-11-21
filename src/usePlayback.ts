@@ -1,22 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type {
+  ExternalSubtitleTrack,
+  LibmediaPlaybackProgress,
+  LibmediaPlaybackState,
+  LibmediaPlaybackStatus,
+  LibmediaPlayerError,
+  LibmediaPlayerEvents,
+  LibmediaPlayerHandle,
+} from './player-api'
 import { useBuffering } from './useBuffering'
 
 type Player = import('@libmedia/avplayer/AVPlayer').default
 type Stream = ReturnType<Player['getStreams']>[number]
-type Status =
-  | 'loading'
-  | 'ready'
-  | 'starting'
-  | 'playing'
-  | 'paused'
-  | 'ended'
-  | 'error'
+type Operation = LibmediaPlayerError['operation']
 
-export interface ExternalSubtitleTrack {
-  src: string
-  label?: string
-  language?: string
-}
+const progressIntervalMs = 1000
+// The range input can round its rightmost position down by up to one step.
+const endSeekToleranceMs = 100
 
 interface Track {
   id: number
@@ -94,19 +94,39 @@ function readMedia(player: Player, supportedCodecs: number[]) {
 export type MediaInfo = ReturnType<typeof readMedia>
 export type PlaybackState = ReturnType<typeof usePlayback>
 
+interface Session {
+  player: Player
+  active: boolean
+  status: LibmediaPlaybackStatus
+  media?: MediaInfo
+  operation?: Promise<unknown>
+  lastVolume: number
+  seeking: boolean
+  suppressEnd: boolean
+  setStatus: (status: LibmediaPlaybackStatus) => void
+  progress: () => LibmediaPlaybackProgress
+  updatePosition: (positionMs: number, publication?: 'sample' | 'force') => void
+  emit: (notify: (events: LibmediaPlayerEvents) => void) => void
+  reportError: (operation: Operation, message: string, fatal: boolean) => void
+}
+
+function seekTarget(media: MediaInfo | undefined, positionMs: number) {
+  if (!media?.duration || media.live || !Number.isFinite(positionMs)) return
+  return Math.max(0, Math.min(Math.round(positionMs), media.duration - 1))
+}
+
 export function usePlayback(
   src: string,
   externalSubtitles: readonly ExternalSubtitleTrack[],
+  initialPositionMs: number | undefined,
   teardown: React.RefObject<Promise<void>>,
+  events: LibmediaPlayerEvents,
 ) {
   const viewport = useRef<HTMLDivElement>(null)
-  const session = useRef<{
-    player: Player
-    operation?: Promise<void>
-    active: boolean
-    lastVolume: number
-  } | null>(null)
-  const [status, setStatus] = useState<Status>('loading')
+  const session = useRef<Session | null>(null)
+  const listeners = useRef(events)
+  const lastReportedState = useRef<LibmediaPlaybackState | undefined>(undefined)
+  const [status, setStatus] = useState<LibmediaPlaybackStatus>('loading')
   const [media, setMedia] = useState<MediaInfo>()
   const [position, setPosition] = useState(0)
   const [pendingSeek, setPendingSeek] = useState<number>()
@@ -124,16 +144,47 @@ export function usePlayback(
     status === 'playing' && pendingSeek === undefined,
   )
 
+  useLayoutEffect(() => {
+    listeners.current = events
+  }, [events])
+
   useEffect(() => {
+    const previous = lastReportedState.current
+    if (previous?.status === status && previous.buffering === buffering) return
+    const state = { src, status, buffering }
+    lastReportedState.current = state
+    listeners.current.onPlaybackStateChange?.(state)
+  }, [src, status, buffering])
+
+  // Invalidate listeners at the source change commit, before the next engine loads.
+  useLayoutEffect(() => {
     const container = viewport.current
     if (!container) return
 
     let active = true
-    let player: Player | undefined
     let observer: ResizeObserver | undefined
+    let current: Session | undefined
+    let positionMs = 0
+    let lastPublishedPosition: number | undefined
+    let lastProgressAt = -Infinity
 
-    function showError() {
-      if (active) setStatus('error')
+    function emit(notify: (events: LibmediaPlayerEvents) => void) {
+      // Host code can issue new commands without interrupting the engine's event dispatch.
+      queueMicrotask(() => {
+        if (active) notify(listeners.current)
+      })
+    }
+
+    function reportLoadError() {
+      if (!active) return
+      const message = 'Could not load the video.'
+      if (current) current.reportError('load', message, true)
+      else {
+        setStatus('error')
+        emit((events) =>
+          events.onError?.({ src, operation: 'load', message, fatal: true }),
+        )
+      }
     }
 
     const loading = teardown.current
@@ -145,35 +196,107 @@ export function usePlayback(
         if (!active) return
 
         const instance = new AVPlayer({ container })
-        player = instance
-        const playback = {
+        const playback: Session = {
           player: instance,
           active,
+          status: 'loading',
           lastVolume: 1,
+          seeking: false,
+          suppressEnd: false,
+          setStatus(next) {
+            playback.status = next
+            setStatus(next)
+          },
+          progress() {
+            const duration = playback.media?.duration ?? 0
+            return {
+              src,
+              positionMs,
+              durationMs: duration > 0 ? duration : null,
+            }
+          },
+          updatePosition(next, publication) {
+            const duration = playback.media?.duration ?? 0
+            positionMs = Math.max(0, Math.min(next, duration || Infinity))
+            setPosition(positionMs)
+            if (!publication || lastPublishedPosition === positionMs) return
+            const now = performance.now()
+            if (
+              publication === 'sample' &&
+              now - lastProgressAt < progressIntervalMs
+            )
+              return
+
+            lastPublishedPosition = positionMs
+            lastProgressAt = now
+            const progress = playback.progress()
+            emit((events) => events.onTimeUpdate?.(progress))
+          },
+          emit,
+          reportError(operation, message, fatal) {
+            if (!active || playback.status === 'error') return
+            if (fatal) playback.setStatus('error')
+            else setNotice(message)
+            emit((events) =>
+              events.onError?.({ src, operation, message, fatal }),
+            )
+          },
         }
+        current = playback
+
         function syncTracks() {
           setAudioId(instance.getSelectedAudioStreamId())
           setSubtitleId(instance.getSelectedSubtitleStreamId())
         }
         instance
-          .on('error', showError)
+          .on('error', () => {
+            if (playback.status === 'loading') reportLoadError()
+            else playback.reportError('playback', 'Playback failed.', true)
+          })
           .on('played', () => {
-            if (!active) return
+            if (!active || playback.status === 'error') return
             syncTracks()
-            setStatus((current) => (current === 'error' ? current : 'playing'))
+            playback.setStatus('playing')
           })
           .on('paused', () => {
-            if (active)
-              setStatus((current) => (current === 'error' ? current : 'paused'))
+            if (!active || playback.status === 'error') return
+            playback.setStatus('paused')
+            const actual = Number(instance.currentTime)
+            if (actual >= 0) playback.updatePosition(actual, 'force')
           })
           .on('ended', () => {
-            if (active) {
-              setPosition(Number(instance.getDuration()))
-              setStatus((current) => (current === 'error' ? current : 'ended'))
+            if (
+              !active ||
+              playback.status === 'error' ||
+              playback.status === 'ended' ||
+              playback.status === 'loading'
+            )
+              return
+            const naturalEnd =
+              (playback.status === 'playing' ||
+                playback.status === 'starting') &&
+              !playback.seeking &&
+              !playback.suppressEnd
+            playback.setStatus('ended')
+            playback.updatePosition(
+              playback.media?.duration || positionMs,
+              'force',
+            )
+            if (naturalEnd) {
+              const progress = playback.progress()
+              emit((events) => events.onEnded?.(progress))
             }
           })
           .on('time', (time) => {
-            if (active && time >= 0n) setPosition(Number(time))
+            if (
+              active &&
+              (playback.status === 'playing' ||
+                playback.status === 'starting') &&
+              !playback.seeking &&
+              time >= 0n
+            ) {
+              playback.updatePosition(Number(time), 'sample')
+            }
           })
           .on('changed', () => {
             if (active) syncTracks()
@@ -191,73 +314,175 @@ export function usePlayback(
             }),
           ),
         })
-        if (!active) return
-        setMedia(readMedia(instance, AVPlayerSupportedCodecs))
+        if (!active || playback.status === 'error') return
+        const media = readMedia(instance, AVPlayerSupportedCodecs)
+        playback.media = media
+        const start = seekTarget(media, initialPositionMs ?? 0)
+        if (start) {
+          try {
+            await instance.seek(BigInt(start))
+            if (active && playback.status === 'loading')
+              playback.updatePosition(start)
+          } catch {
+            playback.reportError(
+              'seek',
+              'Could not restore the initial position.',
+              false,
+            )
+          }
+        }
+        if (!active || playback.status !== 'loading') return
+
         observer = new ResizeObserver(([entry]) => {
           const { width, height } = entry.contentRect
           if (active && width > 0 && height > 0) instance.resize(width, height)
         })
         observer.observe(container)
         session.current = playback
-        setStatus((current) => (current === 'error' ? current : 'ready'))
+        setMedia(media)
+        playback.setStatus('ready')
+        const progress = playback.progress()
+        emit((events) => events.onReady?.(progress))
       })
-      .catch(showError)
+      .catch(reportLoadError)
 
     return () => {
       active = false
       observer?.disconnect()
-      const current = session.current
       if (current) current.active = false
       session.current = null
-      teardown.current = Promise.all([loading, current?.operation])
-        .then(() => player?.destroy())
+      teardown.current = Promise.allSettled([loading, current?.operation])
+        .then(() => current?.player.destroy())
         .catch(() => {})
     }
-  }, [src, externalSubtitles, teardown])
+  }, [src, externalSubtitles, initialPositionMs, teardown])
 
-  function run(
-    action: (player: Player) => Promise<void>,
-    errorMessage?: string,
-  ) {
-    const current = session.current
-    if (!current || current.operation || status === 'error') return
-    setBusy(true)
-    setNotice('')
-    current.operation = action(current.player)
-      .catch(() => {
-        if (!current.active) return
-        if (errorMessage) setNotice(errorMessage)
-        else setStatus('error')
-      })
-      .finally(() => {
-        if (!current.active) return
-        current.operation = undefined
-        setBusy(false)
-        setPendingSeek(undefined)
-      })
-  }
+  const commands = useMemo(() => {
+    function run<Result>(
+      operation: Operation,
+      message: string,
+      action: (current: Session) => Promise<Result>,
+      fatal = false,
+    ): Promise<Result> {
+      const current = session.current
+      if (!current?.active || current.status === 'error') {
+        return Promise.reject(new Error('The player is not ready.'))
+      }
+      if (current.operation) {
+        return Promise.reject(
+          new Error('Another playback operation is in progress.'),
+        )
+      }
+
+      setBusy(true)
+      setNotice('')
+      const aborted = () =>
+        new DOMException('The playback session was replaced.', 'AbortError')
+      const result = (async () => {
+        try {
+          const value = await action(current)
+          if (!current.active) throw aborted()
+          if (current.status === 'error') throw new Error(message)
+          return value
+        } catch {
+          if (!current.active) throw aborted()
+          current.reportError(operation, message, fatal)
+          throw new Error(message)
+        } finally {
+          if (current.active) {
+            current.operation = undefined
+            setBusy(false)
+            setPendingSeek(undefined)
+          }
+        }
+      })()
+      current.operation = result
+      return result
+    }
+
+    const controls: LibmediaPlayerHandle = {
+      play() {
+        return run(
+          'play',
+          'Could not start playback.',
+          async (current) => {
+            if (current.status === 'playing') return
+            current.suppressEnd = false
+            current.setStatus('starting')
+            // Resume the audio context while the browser still has user activation.
+            if (current.player.isSuspended()) await current.player.resume()
+            if (current.active) await current.player.play()
+          },
+          true,
+        )
+      },
+      pause() {
+        if (
+          session.current?.media?.live &&
+          session.current.status === 'playing'
+        ) {
+          return Promise.reject(new Error('Live sources cannot be paused.'))
+        }
+        return run(
+          'pause',
+          'Could not pause playback.',
+          async (current) => {
+            if (current.status === 'playing') await current.player.pause()
+          },
+          true,
+        )
+      },
+      seekTo(requestedPositionMs) {
+        const media = session.current?.media
+        if (!Number.isFinite(requestedPositionMs)) {
+          return Promise.reject(
+            new RangeError('The seek position must be finite.'),
+          )
+        }
+        const target = seekTarget(media, requestedPositionMs)
+        if (target === undefined || !media) {
+          return Promise.reject(
+            new Error('The current source is not seekable.'),
+          )
+        }
+        return run('seek', 'Could not seek.', async (current) => {
+          const preparing = current.status === 'ready'
+          current.seeking = true
+          setPendingSeek(target)
+          try {
+            await current.player.seek(BigInt(target))
+            if (!current.active || current.status === 'error') throw new Error()
+            const actual = preparing
+              ? target
+              : Number(current.player.currentTime)
+            current.suppressEnd =
+              Math.max(target, actual) >= media.duration - endSeekToleranceMs
+            current.updatePosition(actual >= 0 ? actual : target, 'force')
+            return { current, progress: current.progress() }
+          } finally {
+            current.seeking = false
+          }
+        }).then(({ current, progress }) => {
+          current.emit((events) =>
+            events.onSeeked?.({ ...progress, requestedPositionMs }),
+          )
+          return progress.positionMs
+        })
+      },
+    }
+    return { controls, run }
+  }, [])
+
+  const { controls, run } = commands
 
   function togglePlay() {
-    run(async (player) => {
-      if (status === 'playing') await player.pause()
-      else {
-        setStatus('starting')
-        // Resume the audio context while the browser still has user activation.
-        if (player.isSuspended()) await player.resume()
-        await player.play()
-      }
-    })
+    const operation =
+      session.current?.status === 'playing' ? controls.pause() : controls.play()
+    void operation.catch(() => {})
   }
 
-  function seek(target: number) {
-    if (!media?.duration || media.live) return
-    const time = Math.max(0, Math.min(Math.round(target), media.duration - 1))
-    run(async (player) => {
-      setPendingSeek(time)
-      await player.seek(BigInt(time))
-      const actual = Number(player.currentTime)
-      setPosition(status === 'ready' || actual < 0 ? time : actual)
-    }, 'Could not seek.')
+  function seek(time: number) {
+    void controls.seekTo(time).catch(() => {})
   }
 
   function changeVolume(level: number) {
@@ -274,23 +499,26 @@ export function usePlayback(
   }
 
   function selectTrack(kind: 'audio' | 'subtitles', id: number) {
-    run(
-      async (player) => {
+    void run(
+      'track',
+      `Could not switch ${kind === 'audio' ? 'audio' : 'subtitle'} tracks.`,
+      async (current) => {
+        const { player } = current
         if (kind === 'audio') {
           if (id !== audioId) await player.selectAudio(id)
           if (id !== player.getSelectedAudioStreamId()) throw new Error()
         } else {
           if (id !== subtitleId) await player.selectSubtitle(id)
           if (id !== player.getSelectedSubtitleStreamId()) throw new Error()
-          changeCaptions(true)
+          if (current.active) changeCaptions(true)
         }
       },
-      `Could not switch ${kind === 'audio' ? 'audio' : 'subtitle'} tracks.`,
-    )
+    ).catch(() => {})
   }
 
   return {
     viewport,
+    controls,
     status,
     media,
     buffered,

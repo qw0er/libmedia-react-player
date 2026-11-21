@@ -1,21 +1,35 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { CenterControls } from './components/PlaybackButtons'
 import { PlayerControls } from './components/PlayerControls'
 import { PlayerPanel } from './components/PlayerPanel'
 import { type PanelPage, seekStepMs } from './components/player-ui'
 import styles from './player.css?inline'
-import { type ExternalSubtitleTrack, usePlayback } from './usePlayback'
+import type { LibmediaPlayerProps } from './player-api'
+import { usePlayback } from './usePlayback'
 
-export type { ExternalSubtitleTrack } from './usePlayback'
-
-export interface LibmediaPlayerProps {
-  src: string
-  externalSubtitles?: readonly ExternalSubtitleTrack[]
-}
+export type {
+  ExternalSubtitleTrack,
+  LibmediaPlaybackProgress,
+  LibmediaPlaybackState,
+  LibmediaPlaybackStatus,
+  LibmediaPlayerError,
+  LibmediaPlayerEvents,
+  LibmediaPlayerHandle,
+  LibmediaPlayerProps,
+  LibmediaSeekEvent,
+} from './player-api'
 
 export function LibmediaPlayer({
   src,
   externalSubtitles = [],
+  ...props
 }: LibmediaPlayerProps) {
   const teardown = useRef(Promise.resolve())
   const key = JSON.stringify([
@@ -25,6 +39,7 @@ export function LibmediaPlayer({
   return (
     <Playback
       key={key}
+      {...props}
       src={src}
       externalSubtitles={externalSubtitles}
       teardown={teardown}
@@ -34,13 +49,25 @@ export function LibmediaPlayer({
 
 function Playback({
   src,
-  externalSubtitles,
+  externalSubtitles = [],
+  initialPositionMs,
+  ref,
   teardown,
-}: Required<LibmediaPlayerProps> & {
+  ...events
+}: LibmediaPlayerProps & {
   teardown: React.RefObject<Promise<void>>
 }) {
   const [subtitleSources] = useState(() => externalSubtitles)
-  const playback = usePlayback(src, subtitleSources, teardown)
+  const [initialPosition] = useState(initialPositionMs)
+  const playback = usePlayback(
+    src,
+    subtitleSources,
+    initialPosition,
+    teardown,
+    events,
+  )
+  const { controls } = playback
+  useImperativeHandle(ref, () => controls, [controls])
   const { media, status, position, busy, notice, captions, selectedSubtitle } =
     playback
   const root = useRef<HTMLElement>(null)

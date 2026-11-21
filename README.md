@@ -58,6 +58,21 @@ With libmedia 1.3.1, seeking into the final cue of an external SRT can leave tha
 
 With the player region focused, use **Space** or **K** for play and pause, **Left** and **Right** to seek five seconds, **M** to mute, **C** to toggle subtitles, and **F** for fullscreen. Use **Escape** to close an open player menu.
 
+### Playback control and events
+
+Pass `initialPositionMs` to restore progress when a source loads. For later changes, use `ref.current.seekTo(positionMs)`. The ref is typed as `LibmediaPlayerHandle` and also exposes `play()` and `pause()`. All three methods return promises. Call them once the player is ready, handle rejections, and start playback from a user gesture when the browser requires it. A command issued while another playback operation is pending rejects. Live streams support playback through the ref.
+
+| Callback                | Payload and timing                                                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onReady`               | The source is ready and its starting position has been prepared. Includes `positionMs` and `durationMs`.                                                                |
+| `onTimeUpdate`          | The current position and duration. Updates during playback are limited to about once per second. A settled seek, pause, or end can report the new position immediately. |
+| `onPlaybackStateChange` | The playback `status` and a separate `buffering` flag.                                                                                                                  |
+| `onSeeked`              | The requested position and the resulting `positionMs`. Before first playback, this is the prepared start position. The `seekTo` promise returns the same value.         |
+| `onEnded`               | The final position and duration after natural playback completion. Use this event to advance to the next item.                                                          |
+| `onError`               | The failed `operation`, a display-safe `message`, and a `fatal` flag. Handle rejected ref calls for invalid arguments or commands the player cannot accept.             |
+
+Each callback includes the supplied `src`. Times are in milliseconds, and `durationMs` is `null` when the duration is unavailable. Source changes invalidate callbacks from the previous session.
+
 The npm package includes the AVPlayer runtime and 37 SIMD WASM modules. The component loads the runtime when mounted and imports the WASM modules needed for playback. A standard application build follows those imports, so the default setup requires only a browser-accessible media URL.
 
 The bundled runtime uses `blob:` URLs for AVPlayer scripts and Workers. Applications with a Content Security Policy must permit those URLs. The bundled WASM files target SIMD-capable browsers.
