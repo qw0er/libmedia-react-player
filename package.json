@@ -52,19 +52,9 @@
     ".": {
       "types": "./dist/src/LibmediaPlayer.d.ts",
       "import": "./dist/index.js"
-    },
-    "./vite": {
-      "types": "./dist/vite/index.d.ts",
-      "import": "./dist/vite.js"
     }
   },
   "peerDependencies": {
-    "react": "^19.0.0",
-    "vite": "^8.0.0"
-  },
-  "peerDependenciesMeta": {
-    "vite": {
-      "optional": true
-    }
+    "react": "^19.0.0"
   }
 }
