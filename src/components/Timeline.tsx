@@ -1,7 +1,7 @@
 import { type CSSProperties, useRef, useState } from 'react'
 import type { BufferedRange } from '../useBuffering'
 import type { MediaInfo } from '../usePlayback'
-import { clock, seekStepMs } from './player-ui'
+import { clock, seekStepMs, usePlayerLabels } from './player-ui'
 
 interface TimelineProps {
   chapters: MediaInfo['chapters']
@@ -22,6 +22,7 @@ export function Timeline({
   onScrub,
   onSeek,
 }: TimelineProps) {
+  const labels = usePlayerLabels()
   const dragging = useRef(false)
   const [hover, setHover] = useState<number>()
   const starts = [
@@ -105,7 +106,7 @@ export function Timeline({
       </div>
       <span className="lmp-thumb" aria-hidden="true" />
       <input
-        aria-label="Seek"
+        aria-label={labels.seek}
         aria-valuetext={`${clock(time)} of ${clock(duration)}`}
         type="range"
         min={0}

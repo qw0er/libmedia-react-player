@@ -1,184 +1,168 @@
 # libmedia-react-player
 
-A React video player built on [libmedia AVPlayer](https://github.com/zhaohappy/libmedia), with a focus on Matroska (MKV) playback. It includes a responsive player interface, chapter navigation, audio and subtitle track selection, and a WebAssembly SIMD software decoding fallback.
+A multi-format React media player with responsive controls, chapter navigation, audio and subtitle track selection, and a bundled WebAssembly SIMD decoding fallback. Built on libmedia AVPlayer 1.3.1.
 
-See the [v0.1 requirements](docs/requirements.md) for the planned scope.
-
-## Requirements
-
-- React 19
-- A browser with WebAssembly SIMD support
-- A browser-accessible media URL
-
-The package includes the AVPlayer runtime and its WASM assets. Applications with a Content Security Policy must allow `blob:` URLs for the runtime's scripts and Workers. WASM multithreading additionally requires [cross-origin isolation](#cross-origin-isolation).
-
-## Installation
-
-Install the package from npm in your React application:
+## Quick start
 
 ```sh
 npm install libmedia-react-player
 ```
 
-## Quick start
-
 ```tsx
 import { LibmediaPlayer } from 'libmedia-react-player'
 
 export default function App() {
-  return <LibmediaPlayer src="/media/sample.mkv" />
+  return <LibmediaPlayer src="/media/sample.mp4" />
 }
 ```
 
-The player adapts its controls to its width. Use the time display to open the chapter list when a chevron is shown. The **CC** button toggles the selected subtitle track; Settings provides track selection, subtitle timing, and playback speed.
+- **Chapters** — Open the time display when it shows a chevron.
+- **Subtitles** — Use **CC** to toggle captions. Select tracks and adjust subtitle delay in **Settings**.
+- **Keyboard** — Focus the player. **Space** or **K** plays or pauses, **← / →** seeks five seconds, **M** mutes, **C** toggles captions, **F** toggles fullscreen, and **Esc** closes an open menu.
 
-With the player region focused, use **Space** or **K** to play or pause, **Left** and **Right** to seek five seconds, **M** to mute, **C** to toggle subtitles, and **F** for fullscreen. **Escape** closes an open menu.
+## Formats and decoding
 
-## External subtitles
+| Category                  | Examples                                            |
+| ------------------------- | --------------------------------------------------- |
+| Video containers          | MP4, MOV, Matroska (MKV), WebM, AVI, FLV, MPEG-TS   |
+| Audio inputs              | MP3, AAC, FLAC, WAV, Ogg                            |
+| Bundled software decoders | H.264, HEVC (H.265), AV1, VP8, VP9, AAC, Opus, FLAC |
 
-Pass distinct URLs for supported external text subtitle tracks:
+These examples cover containers recognized by the bundled engine and decoders shipped with the package. Playback depends on the file's codecs, profiles, and browser capabilities. HEVC Main 10 with AAC in MKV was verified in Chrome and packaged Electron. [Upstream format and codec tables](https://github.com/zhaohappy/libmedia#当前支持的封装格式)
+
+## Subtitles
+
+| Use case                               | Track input                                                      |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| Embedded text subtitles                | Automatically listed when supported by AVPlayer                  |
+| External subtitle URL                  | `{ src: '/media/sample.en.srt', label: 'English' }`              |
+| Authenticated or extensionless sidecar | Fetch it in your app and pass `{ content: blob, format: 'srt' }` |
+| Styled ASS/SSA with custom fonts       | Pass a complete script and font Blobs as shown below             |
+
+JASSUB loads when the viewer selects a track with `renderer: 'styled'`. Use this option for ASS/SSA tracks that need custom fonts, including fonts extracted from MKV attachments, or need to display cues that are already active at the seek target.
 
 ```tsx
-export function PlayerWithSubtitles() {
-  return (
-    <LibmediaPlayer
-      src="/media/sample.mkv"
-      externalSubtitles={[
-        { src: '/media/sample.en.srt', label: 'English', language: 'en' },
-      ]}
-    />
-  )
-}
+;<LibmediaPlayer
+  src="/media/sample.mkv"
+  externalSubtitles={[
+    {
+      renderer: 'styled',
+      format: 'ass',
+      content: assBlob,
+      fonts: [fontBlob],
+      label: 'English (styled)',
+    },
+  ]}
+/>
 ```
 
-With libmedia 1.3.1, seeking into the final cue of an external SRT can leave that cue undisplayed; it can appear during continuous playback.
+- `offsetMs` adjusts one sidecar. Positive values delay its cues. The viewer's subtitle delay is added to that offset.
+- AVPlayer's default renderer may miss an embedded ASS cue already active at the resume position. Seeking into the final cue of an external SRT can also leave it blank.
+- The tested Matroska PGS bitmap track was unavailable in the subtitle menu.
 
-## API
+## Authenticated media
 
-### `LibmediaPlayer` props
-
-| Prop                    | Type                                        | Description                                                                                                                     |
-| ----------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `src`                   | `string`                                    | Required media URL.                                                                                                             |
-| `sourceFormat`          | `string`                                    | Optional file extension to pass to AVPlayer. For example, use `sourceFormat="mkv"` with `src="/api/media/123"`.                 |
-| `mediaRequest`          | `LibmediaRequestOptions`                    | Optional headers and Fetch credentials mode for media requests, including byte-range requests.                                  |
-| `externalSubtitles`     | `readonly ExternalSubtitleTrack[]`          | External subtitle tracks. Each has a required `src` and optional `label` and `language`.                                        |
-| `initialPositionMs`     | `number`                                    | Starting position in milliseconds, applied when the source loads.                                                               |
-| `ref`                   | `Ref<LibmediaPlayerHandle>`                 | Access to playback commands.                                                                                                    |
-| `onReady`               | `(event: LibmediaPlaybackProgress) => void` | Fires when the source and starting position are ready.                                                                          |
-| `onTimeUpdate`          | `(event: LibmediaPlaybackProgress) => void` | Reports progress, generally at most once per second during playback; settled seeks, pauses, and endings can report immediately. |
-| `onPlaybackStateChange` | `(event: LibmediaPlaybackState) => void`    | Reports playback status and buffering state.                                                                                    |
-| `onSeeked`              | `(event: LibmediaSeekEvent) => void`        | Reports the requested and settled positions.                                                                                    |
-| `onTrackChange`         | `(event: LibmediaTrackChangeEvent) => void` | Reports the active audio and subtitle tracks when playback first starts and when either selection changes.                      |
-| `onEnded`               | `(event: LibmediaPlaybackProgress) => void` | Reports the final position after natural playback completion.                                                                   |
-| `onNextEpisode`         | `() => void`                                | Shows a Next episode button beside Play and calls the host when activated. Omit this prop to hide the button.                   |
-| `onError`               | `(event: LibmediaPlayerError) => void`      | Reports the failed operation, a display-safe message, and whether the error is fatal.                                           |
-
-All event payloads include `src`. Progress events include `positionMs` and `durationMs`; duration is `null` when unknown or live. `onSeeked` also includes `requestedPositionMs`. Callbacks from an earlier session are invalidated when the source changes. The component exports these event types, `LibmediaPlayerProps`, `ExternalSubtitleTrack`, and `LibmediaPlayerHandle`.
-
-`onTrackChange` receives `{ src, audio, subtitle }`. Each active track has an AVPlayer stream ID, a label, and an optional language. Track IDs belong to the current playback session. `audio` is `null` when no audio track is active. `subtitle` is `null` when subtitles are off or no supported subtitle track is active.
-
-### Authenticated media
+Use `sourceFormat` when the URL has no file extension. The player applies `mediaRequest` to the main media, including byte-range requests.
 
 ```tsx
 ;<LibmediaPlayer
   src="/api/media/123"
-  sourceFormat="mkv"
+  sourceFormat="mp4"
   mediaRequest={{ headers: { Authorization: `Bearer ${accessToken}` } }}
 />
 ```
 
-For cross-origin cookie authentication, set `mediaRequest={{ credentials: 'include' }}` and configure the media server for credentialed CORS. Custom headers such as `Authorization` must be allowed by the media server when the request is cross-origin. The options apply to the main media source. External subtitles follow their own URL and browser defaults.
+- For cross-origin requests, configure CORS for the application origin and request headers. Expose `Accept-Ranges` and `Content-Range` for byte-range playback.
+- For cross-origin cookies, use `mediaRequest={{ credentials: 'include' }}` and configure credentialed CORS.
+- On a fatal `load` error from HTTP 401, refresh the credentials and pass the updated request. To retry with the same credentials, remount with a new React `key`.
 
-Changing a header or the credentials mode reloads the current source. Recreating an options object with the same values keeps the current playback session.
+## API
 
-With AVPlayer 1.3.1, an HTTP 401 during media loading can leave the player in the loading state without firing `onError`.
+### Props
 
-### Playback commands
+| Prop                | Purpose                                                                   |
+| ------------------- | ------------------------------------------------------------------------- |
+| `src`               | Required media URL                                                        |
+| `sourceFormat`      | Extension hint such as `mp4`, `mkv`, or `webm`                            |
+| `mediaRequest`      | Optional fetch headers and credentials mode                               |
+| `externalSubtitles` | Subtitle tracks supplied by the host                                      |
+| `initialPositionMs` | Resume position applied when the source loads                             |
+| `initialAudio`      | File stream index. Pass `null` for silence or omit for the engine default |
+| `labels`            | Override control text and accessible names, including `nextEpisode`       |
+| `className`         | Additional CSS class on the player root                                   |
+| `style`             | Inline CSS styles on the player root                                      |
+| `onNextEpisode`     | Shows the next-episode button and calls the host when pressed             |
+| `ref`               | `Ref<LibmediaPlayerHandle>` for playback commands                         |
 
-The player handle exposes `play()`, `pause()`, and `seekTo(positionMs)`. Each returns a promise; `seekTo` resolves to the settled position in milliseconds. Before first playback, this is the prepared start position.
-
-Call commands after the player is ready and handle rejected promises. Browsers may require a user gesture to start playback. A command issued while another playback operation is pending rejects. Live streams can be controlled through the ref.
+The player defaults to full container width and a 16:9 ratio. Use `className`
+for responsive layout or `style` for a local override. Fullscreen fills the
+screen and restores the host layout on exit.
 
 ```tsx
-import { useRef } from 'react'
-import {
-  LibmediaPlayer,
-  type LibmediaPlayerHandle,
-} from 'libmedia-react-player'
-
-export function Player() {
-  const player = useRef<LibmediaPlayerHandle>(null)
-
-  async function resume() {
-    try {
-      await player.current?.play()
-    } catch (error) {
-      console.error('Playback could not start', error)
-    }
-  }
-
-  return (
-    <>
-      <LibmediaPlayer
-        ref={player}
-        src="/media/sample.mkv"
-        initialPositionMs={30000}
-      />
-      <button type="button" onClick={resume}>
-        Play
-      </button>
-    </>
-  )
-}
+;<LibmediaPlayer src={url} style={{ aspectRatio: '4 / 3' }} />
 ```
 
-### Cross-origin isolation
+### Events
 
-WASM multithreading uses `SharedArrayBuffer` and requires cross-origin isolation. Configure the server or CDN serving the page to send these headers with the HTML response:
+| Event                     | What it reports                                                                                                                                                |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onReady`                 | Source and starting position are ready                                                                                                                         |
+| `onInitialPositionResult` | Requested and settled position plus `restored`, before `onReady`. Check `restored` before replacing saved progress                                             |
+| `onPlaybackStateChange`   | Status, effective `playbackRate`, `seeking`, and `buffering`. A seek starts before position updates and clears when it settles                                 |
+| `onTimeUpdate`            | Current position and duration. Updates during playback are generally emitted once a second                                                                     |
+| `onSeeked`                | Requested and settled positions after a successful seek                                                                                                        |
+| `onTrackChange`           | Initial active tracks on playback start, then changes. Audio includes the file's `streamIndex`, which can be matched to FFprobe's `stream.index` for that file |
+| `onEnded`                 | Natural playback completion                                                                                                                                    |
+| `onError`                 | Failed operation, display-safe message, and whether the error is fatal                                                                                         |
+
+- Time values are in milliseconds. Duration is `null` for live streams or unknown durations.
+- Events include `src` and come from the active playback session.
+- An audio or subtitle value of `null` in `onTrackChange` means that track type has no active output.
+
+### Commands
+
+Call these methods on the player ref after `onReady`. Handle rejected promises and start playback from a user gesture when the browser requires one.
+
+| Method                     | Result                                                                                                    |
+| -------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `play()` / `pause()`       | Start or pause playback                                                                                   |
+| `seekTo(positionMs)`       | Resolve to the settled position in milliseconds                                                           |
+| `selectAudio(streamIndex)` | Select a file stream index. Pass `null` for silence. Selecting a track again restores the viewer's volume |
+
+See [TypeScript definitions](src/player-api.ts) for full signatures.
+
+## Runtime and deployment
+
+| Scenario                      | Requirements                                                                                                                                                                                                         |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Basic playback                | React 19, WebAssembly SIMD, and a browser-accessible media URL                                                                                                                                                       |
+| Software playback             | WebGL and Web Audio                                                                                                                                                                                                  |
+| Styled subtitles              | Workers and OffscreenCanvas. Deploy the bundled subtitle Worker alongside the other built assets                                                                                                                     |
+| Content Security Policy (CSP) | Allow `blob:` in `script-src` and `worker-src`, and `'wasm-unsafe-eval'` in `script-src`. Allow the media origin in `connect-src`, `blob:` in `media-src` for MSE, and `data:` in `connect-src` for styled subtitles |
+
+For multithreaded WASM, serve the page with these headers and permit cross-origin resources through CORS or CORP as applicable. Check `window.crossOriginIsolated` to confirm.
 
 ```http
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-For Vite development, add them to the host application's configuration:
-
-```ts
-import { defineConfig } from 'vite'
-
-export default defineConfig({
-  server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-  },
-})
-```
-
-Cross-origin resources must also be permitted by CORS or CORP as applicable. Check `window.crossOriginIsolated` in the browser to verify the page is isolated.
-
 ## Development
 
-Building the package requires Node.js 22.13 or later in the 22.x series, or Node.js 24 and above.
+Use Node.js 22.13+ in the 22.x series or Node.js 24+. Place a video in `.temp/` to use it in the demo.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Place a video in the ignored `.temp/` directory and open the local dev server. The demo selects the first video by filename and uses the same player component and bundled runtime as the package.
-
-| Command          | Purpose                                                     |
-| ---------------- | ----------------------------------------------------------- |
-| `npm run format` | Format with Biome.                                          |
-| `npm run lint`   | Run Biome lint rules.                                       |
-| `npm run check`  | Check formatting, lint, import order, and TypeScript.       |
-| `npm run build`  | Build the package and TypeScript declarations into `dist/`. |
-
-The library source is in `src/`, and the demo is in `demo/`. The vendored assets include the prebuilt player from `@libmedia/avplayer@1.3.1` and 37 SIMD WASM modules from the [upstream 1.3.1 assets](https://github.com/zhaohappy/libmedia/tree/152f629d3021fd8013efa464fcb7b55f9fbe7753/dist).
+| Command         | Purpose                                         |
+| --------------- | ----------------------------------------------- |
+| `npm run check` | Biome and TypeScript checks                     |
+| `npm run build` | Build the library and declarations into `dist/` |
 
 ## License
 
-Original project code is licensed under [LGPL-3.0-or-later](LICENSE).
+- Project code — [LGPL-3.0-or-later](LICENSE)
+- Bundled AVPlayer and SIMD decoders — [upstream libmedia 1.3.1 assets](https://github.com/zhaohappy/libmedia/tree/152f629d3021fd8013efa464fcb7b55f9fbe7753/dist)
+- Bundled JASSUB — upstream license in `dist/JASSUB-LICENSE`

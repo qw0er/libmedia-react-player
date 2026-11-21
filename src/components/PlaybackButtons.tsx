@@ -1,8 +1,8 @@
 import { Pause, Play, RotateCcw, RotateCw } from 'lucide-react'
 import type { PlaybackState } from '../usePlayback'
-import { seekStepMs } from './player-ui'
+import { seekStepMs, usePlayerLabels } from './player-ui'
 
-const playIcons = { Play, Pause, Replay: RotateCcw }
+const playIcons = { play: Play, pause: Pause, replay: RotateCcw }
 
 export function PlayButton({
   className,
@@ -15,9 +15,11 @@ export function PlayButton({
   disabled: boolean
   onClick: () => void
 }) {
-  const label =
-    status === 'ended' ? 'Replay' : status === 'playing' ? 'Pause' : 'Play'
-  const Icon = playIcons[label]
+  const labels = usePlayerLabels()
+  const action =
+    status === 'ended' ? 'replay' : status === 'playing' ? 'pause' : 'play'
+  const Icon = playIcons[action]
+  const label = labels[action]
   return (
     <button
       className={className}
@@ -41,9 +43,11 @@ function SeekButton({
   disabled: boolean
   onClick: () => void
 }) {
+  const labels = usePlayerLabels()
   const Icon = direction === 'backward' ? RotateCcw : RotateCw
   const seconds = seekStepMs / 1000
-  const label = `Skip ${direction} ${seconds} seconds`
+  const label =
+    direction === 'backward' ? labels.skipBackward : labels.skipForward
   return (
     <button
       className="lmp-skip"
@@ -102,10 +106,11 @@ export function VolumeSlider({
   volume,
   changeVolume,
 }: Pick<PlaybackState, 'volume' | 'changeVolume'>) {
+  const labels = usePlayerLabels()
   return (
     <input
       type="range"
-      aria-label="Volume"
+      aria-label={labels.volume}
       min={0}
       max={1}
       step={0.05}

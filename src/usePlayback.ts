@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { BundledPlayer } from './bundledPlayer'
 import type {
   ExternalSubtitleTrack,
+  LibmediaAudioSelection,
   LibmediaPlaybackProgress,
   LibmediaPlaybackState,
   LibmediaPlaybackStatus,
@@ -8,12 +10,11 @@ import type {
   LibmediaPlayerEvents,
   LibmediaPlayerHandle,
   LibmediaRequestOptions,
-  LibmediaTrack,
   LibmediaTrackChangeEvent,
 } from './player-api'
 import { useBuffering } from './useBuffering'
 
-type Player = import('@libmedia/avplayer/AVPlayer').default
+type Player = BundledPlayer
 type Stream = ReturnType<Player['getStreams']>[number]
 type Operation = LibmediaPlayerError['operation']
 
@@ -22,18 +23,20 @@ const progressIntervalMs = 1000
 const endSeekToleranceMs = 100
 
 interface TrackSelection {
-  selectedAudio?: LibmediaTrack
-  selectedSubtitle?: LibmediaTrack
+  selectedAudio?: MediaInfo['audio'][number]
+  selectedSubtitle?: MediaInfo['subtitles'][number]
   captions: boolean
+  styledSubtitle?: Extract<ExternalSubtitleTrack, { renderer: 'styled' }>
 }
 
 function metadataText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function readTracks(streams: Stream[], fallback: string): LibmediaTrack[] {
-  const tracks = streams.map(({ id, metadata }, index) => ({
+function readTracks(streams: Stream[], fallback: string) {
+  const tracks = streams.map(({ id, index: streamIndex, metadata }, index) => ({
     id,
+    streamIndex,
     label: metadataText(metadata.title),
     language: metadataText(metadata.language) || undefined,
     number: index + 1,
@@ -49,6 +52,7 @@ function readTracks(streams: Stream[], fallback: string): LibmediaTrack[] {
     const number = `${fallback} ${track.number}`
     return {
       id: track.id,
+      streamIndex: track.streamIndex,
       label: track.label
         ? duplicate
           ? `${track.label} (${number})`
@@ -61,6 +65,9 @@ function readTracks(streams: Stream[], fallback: string): LibmediaTrack[] {
 
 function readMedia(player: Player, supportedCodecs: number[]) {
   const streams = player.getStreams()
+  const video = streams.find(
+    (stream) => stream.mediaType === 'Video',
+  )?.codecparProxy
   const chapters = player
     .getChapters()
     .flatMap(({ start, timeBase, metadata }, index) => {
@@ -79,6 +86,8 @@ function readMedia(player: Player, supportedCodecs: number[]) {
     duration: Number(player.getDuration()),
     live: player.isLive(),
     chapters,
+    videoAspectRatio:
+      video?.width && video.height ? video.width / video.height : undefined,
     audio: readTracks(
       streams.filter((stream) => stream.mediaType === 'Audio'),
       'Audio',
@@ -104,9 +113,17 @@ interface Session {
   media?: MediaInfo
   operation?: Promise<unknown>
   lastVolume: number
+  audioSilent: boolean
   seeking: boolean
   suppressEnd: boolean
   setStatus: (status: LibmediaPlaybackStatus) => void
+  setSeeking: (seeking: boolean) => void
+  publishState: () => void
+  selectAudio: (selection: LibmediaAudioSelection) => Promise<void>
+  checkAudioSelection: () => void
+  setVolume: (volume: number) => void
+  setSubtitleDelay: (delay: number) => void
+  subtitleClock: () => number | undefined
   progress: () => LibmediaPlaybackProgress
   updatePosition: (positionMs: number, publication?: 'sample' | 'force') => void
   syncTracks: (captions?: boolean) => void
@@ -125,13 +142,14 @@ export function usePlayback(
   mediaRequest: LibmediaRequestOptions | undefined,
   externalSubtitles: readonly ExternalSubtitleTrack[],
   initialPositionMs: number | undefined,
+  initialAudio: LibmediaAudioSelection | undefined,
   teardown: React.RefObject<Promise<void>>,
   events: LibmediaPlayerEvents,
 ) {
   const viewport = useRef<HTMLDivElement>(null)
   const session = useRef<Session | null>(null)
   const listeners = useRef(events)
-  const lastReportedState = useRef<LibmediaPlaybackState | undefined>(undefined)
+  const stalled = useRef(false)
   const [status, setStatus] = useState<LibmediaPlaybackStatus>('loading')
   const [media, setMedia] = useState<MediaInfo>()
   const [position, setPosition] = useState(0)
@@ -153,12 +171,9 @@ export function usePlayback(
   }, [events])
 
   useEffect(() => {
-    const previous = lastReportedState.current
-    if (previous?.status === status && previous.buffering === buffering) return
-    const state = { src, status, buffering }
-    lastReportedState.current = state
-    listeners.current.onPlaybackStateChange?.(state)
-  }, [src, status, buffering])
+    stalled.current = buffering
+    session.current?.publishState()
+  }, [buffering])
 
   // Invalidate listeners at the source change commit, before the next engine loads.
   useLayoutEffect(() => {
@@ -171,6 +186,7 @@ export function usePlayback(
     let positionMs = 0
     let lastPublishedPosition: number | undefined
     let lastProgressAt = -Infinity
+    let lastReportedState: LibmediaPlaybackState | undefined
 
     function emit(notify: (events: LibmediaPlayerEvents) => void) {
       // Host code can issue new commands without interrupting the engine's event dispatch.
@@ -179,18 +195,45 @@ export function usePlayback(
       })
     }
 
+    function publishState(state: LibmediaPlaybackState) {
+      const previous = lastReportedState
+      if (
+        previous?.status === state.status &&
+        previous.buffering === state.buffering &&
+        previous.playbackRate === state.playbackRate &&
+        previous.seeking === state.seeking
+      )
+        return
+      lastReportedState = state
+      emit((events) => events.onPlaybackStateChange?.(state))
+    }
+
     function reportLoadError() {
       if (!active) return
       const message = 'Could not load the video.'
       if (current) current.reportError('load', message, true)
       else {
         setStatus('error')
+        publishState({
+          src,
+          status: 'error',
+          buffering: false,
+          playbackRate: 1,
+          seeking: false,
+        })
         emit((events) =>
           events.onError?.({ src, operation: 'load', message, fatal: true }),
         )
       }
     }
 
+    publishState({
+      src,
+      status: 'loading',
+      buffering: false,
+      playbackRate: 1,
+      seeking: false,
+    })
     const loading = teardown.current
       .then(async () => {
         if (!active) return
@@ -199,18 +242,112 @@ export function usePlayback(
           await loadBundledPlayer()
         if (!active) return
 
-        const instance = new AVPlayer({ container })
+        let preferredAudio: number | undefined
+        let verifiedAudio = false
+        let userVolume = 1
+        let userSubtitleDelay = 0
+        let subtitleOffset = 0
+        const sidecars = new Map<number, ExternalSubtitleTrack>()
+        const instance = new AVPlayer({
+          container,
+          findBestStream(streams, mediaType) {
+            // AVMediaType.Audio. Other stream types use the engine's default.
+            if (mediaType === 1 && preferredAudio !== undefined)
+              return streams.find((stream) => stream.id === preferredAudio)
+          },
+        })
         let selection: TrackSelection | undefined
         const playback: Session = {
           player: instance,
           active,
           status: 'loading',
           lastVolume: 1,
+          audioSilent: false,
           seeking: false,
           suppressEnd: false,
           setStatus(next) {
             playback.status = next
             setStatus(next)
+            playback.publishState()
+          },
+          setSeeking(seeking) {
+            playback.seeking = seeking
+            if (seeking) stalled.current = false
+            playback.publishState()
+          },
+          publishState() {
+            if (!active) return
+            publishState({
+              src,
+              status: playback.status,
+              playbackRate: instance.getPlaybackRate(),
+              seeking: playback.seeking,
+              buffering:
+                playback.status === 'playing' &&
+                !playback.seeking &&
+                stalled.current,
+            })
+          },
+          setVolume(level) {
+            userVolume = level
+            if (level > 0) playback.lastVolume = level
+            setVolume(level)
+            instance.setVolume(
+              playback.audioSilent ||
+                (!verifiedAudio && preferredAudio !== undefined)
+                ? 0
+                : level,
+              true,
+            )
+          },
+          async selectAudio(requested) {
+            const track = playback.media?.audio.find(
+              (track) => track.streamIndex === requested,
+            )
+            if (requested !== null && !track)
+              throw new Error('The requested audio stream is unavailable.')
+            if (playback.status === 'ready' || playback.status === 'loading') {
+              preferredAudio = track?.id
+              verifiedAudio = false
+            } else if (
+              track &&
+              instance.getSelectedAudioStreamId() !== track.id
+            ) {
+              await instance.selectAudio(track.id)
+              if (!active || instance.getSelectedAudioStreamId() !== track.id)
+                throw new Error('The requested audio stream is unavailable.')
+            }
+            playback.audioSilent = requested === null
+            playback.setVolume(userVolume)
+            playback.syncTracks()
+          },
+          checkAudioSelection() {
+            if (verifiedAudio || preferredAudio === undefined) return
+            verifiedAudio = true
+            if (instance.getSelectedAudioStreamId() !== preferredAudio) {
+              playback.audioSilent = true
+              playback.reportError(
+                'track',
+                'The requested audio stream is unavailable.',
+                false,
+              )
+            }
+            playback.setVolume(userVolume)
+          },
+          setSubtitleDelay(value) {
+            if (!Number.isFinite(value)) return
+            userSubtitleDelay = Math.round(value)
+            setDelay(userSubtitleDelay)
+            instance.setSubtitleDelay(userSubtitleDelay + subtitleOffset)
+          },
+          subtitleClock() {
+            if (playback.seeking) return
+            const time = instance.currentTime
+            const currentPosition =
+              playback.status === 'playing' && time >= 0n
+                ? Number(time)
+                : positionMs
+            return currentPosition - userSubtitleDelay - subtitleOffset
           },
           progress() {
             const duration = playback.media?.duration ?? 0
@@ -238,12 +375,21 @@ export function usePlayback(
             emit((events) => events.onTimeUpdate?.(progress))
           },
           syncTracks(captions = selection?.captions ?? true) {
-            if (!active || playback.status === 'error' || !playback.media)
+            if (
+              !active ||
+              playback.status === 'error' ||
+              !playback.media ||
+              playback.status === 'loading' ||
+              playback.status === 'ready' ||
+              (!verifiedAudio && preferredAudio !== undefined)
+            )
               return
             const { audio, subtitles } = playback.media
             const audioId = instance.getSelectedAudioStreamId()
             const subtitleId = instance.getSelectedSubtitleStreamId()
-            const selectedAudio = audio.find((track) => track.id === audioId)
+            const selectedAudio = playback.audioSilent
+              ? undefined
+              : audio.find((track) => track.id === audioId)
             const selectedSubtitle = subtitles.find(
               (track) => track.id === subtitleId,
             )
@@ -255,7 +401,20 @@ export function usePlayback(
             )
               return
 
-            selection = { selectedAudio, selectedSubtitle, captions }
+            const sidecar =
+              selectedSubtitle && sidecars.get(selectedSubtitle.id)
+            if (previous?.selectedSubtitle !== selectedSubtitle) {
+              const offset = sidecar?.offsetMs ?? 0
+              subtitleOffset = Number.isFinite(offset) ? Math.round(offset) : 0
+              playback.setSubtitleDelay(userSubtitleDelay)
+            }
+            selection = {
+              selectedAudio,
+              selectedSubtitle,
+              captions,
+              styledSubtitle:
+                sidecar?.renderer === 'styled' ? sidecar : undefined,
+            }
             setTracks(selection)
             const visibleSubtitle = captions ? selectedSubtitle : undefined
             const previousSubtitle = previous?.captions
@@ -294,6 +453,7 @@ export function usePlayback(
           })
           .on('played', () => {
             if (!active || playback.status === 'error') return
+            playback.checkAudioSelection()
             playback.syncTracks()
             playback.setStatus('playing')
           })
@@ -340,31 +500,71 @@ export function usePlayback(
           .on('changed', () => {
             playback.syncTracks()
           })
-          .on('volumeChange', (level) => {
-            if (active) setVolume(level)
-          })
 
         await instance.load(new URL(src, document.baseURI).href, {
           ext: sourceFormat,
           http: mediaRequest,
-          externalSubtitles: externalSubtitles.map(
-            ({ src, label, language }) => ({
-              source: new URL(src, document.baseURI).href,
-              title: label,
-              lang: language,
-            }),
-          ),
         })
+        for (const [index, track] of externalSubtitles.entries()) {
+          if (!active || playback.status === 'error') return
+          const { src, content, format, label, language } = track
+          const count = instance.getStreams().length
+          await instance.loadExternalSubtitle({
+            source:
+              content === undefined
+                ? new URL(src, document.baseURI).href
+                : new File(
+                    [content],
+                    `subtitle-${index}.${track.renderer === 'styled' ? 'ass' : format.trim().replace(/^\./, '').toLowerCase()}`,
+                  ),
+            title: label,
+            lang: language,
+          })
+          const stream = instance.getStreams()[count]
+          if (stream?.mediaType === 'Subtitle') sidecars.set(stream.id, track)
+        }
         if (!active || playback.status === 'error') return
         const media = readMedia(instance, AVPlayerSupportedCodecs)
         playback.media = media
-        const start = seekTarget(media, initialPositionMs ?? 0)
-        if (start) {
+        if (initialAudio !== undefined) {
           try {
-            await instance.seek(BigInt(start))
-            if (active && playback.status === 'loading')
-              playback.updatePosition(start)
+            await playback.selectAudio(initialAudio)
           } catch {
+            await playback.selectAudio(null)
+            playback.reportError(
+              'track',
+              'The requested audio stream is unavailable.',
+              false,
+            )
+          }
+        }
+        if (!active || playback.status !== 'loading') return
+        if (initialPositionMs !== undefined) {
+          let restored = initialPositionMs === 0
+          const start = seekTarget(media, initialPositionMs)
+          if (!restored && start !== undefined) {
+            playback.setSeeking(true)
+            try {
+              const actual = await instance.seek(BigInt(start))
+              if (!active || playback.status !== 'loading') return
+              if (actual != null) {
+                playback.updatePosition(Number(actual))
+                restored = true
+              }
+            } catch {
+              // The result is also reported for rejected engine seeks.
+            } finally {
+              playback.setSeeking(false)
+            }
+          }
+          if (!active || playback.status !== 'loading') return
+          const result = {
+            ...playback.progress(),
+            requestedPositionMs: initialPositionMs,
+            restored,
+          }
+          emit((events) => events.onInitialPositionResult?.(result))
+          if (!restored) {
             playback.reportError(
               'seek',
               'Could not restore the initial position.',
@@ -390,7 +590,10 @@ export function usePlayback(
     return () => {
       active = false
       observer?.disconnect()
-      if (current) current.active = false
+      if (current) {
+        current.active = false
+        current.player.setVolume(0, true)
+      }
       session.current = null
       teardown.current = Promise.allSettled([loading, current?.operation])
         .then(() => current?.player.destroy())
@@ -402,6 +605,7 @@ export function usePlayback(
     mediaRequest,
     externalSubtitles,
     initialPositionMs,
+    initialAudio,
     teardown,
   ])
 
@@ -455,7 +659,7 @@ export function usePlayback(
           'Could not start playback.',
           async (current) => {
             if (current.status === 'playing') return
-            current.suppressEnd = false
+            if (current.status === 'ended') current.suppressEnd = false
             current.setStatus('starting')
             // Resume the audio context while the browser still has user activation.
             if (current.player.isSuspended()) await current.player.resume()
@@ -495,20 +699,20 @@ export function usePlayback(
         }
         return run('seek', 'Could not seek.', async (current) => {
           const preparing = current.status === 'ready'
-          current.seeking = true
+          current.setSeeking(true)
           setPendingSeek(target)
           try {
-            await current.player.seek(BigInt(target))
+            const landed = await current.player.seek(BigInt(target))
             if (!current.active || current.status === 'error') throw new Error()
-            const actual = preparing
-              ? target
-              : Number(current.player.currentTime)
+            if (landed == null) throw new Error('The media seek failed.')
+            const reported = Number(current.player.currentTime)
+            const actual = preparing || reported < 0 ? Number(landed) : reported
             current.suppressEnd =
               Math.max(target, actual) >= media.duration - endSeekToleranceMs
-            current.updatePosition(actual >= 0 ? actual : target, 'force')
+            current.updatePosition(actual, 'force')
             return { current, progress: current.progress() }
           } finally {
-            current.seeking = false
+            current.setSeeking(false)
           }
         }).then(({ current, progress }) => {
           current.emit((events) =>
@@ -517,8 +721,25 @@ export function usePlayback(
           return progress.positionMs
         })
       },
+      selectAudio(selection) {
+        return run(
+          'track',
+          'Could not select the requested audio stream.',
+          (current) => current.selectAudio(selection),
+        )
+      },
     }
-    return { controls, run }
+    return {
+      controls,
+      run,
+      subtitleClock: () => session.current?.subtitleClock(),
+      reportSubtitleError: () =>
+        session.current?.reportError(
+          'track',
+          'Could not render the styled subtitle track.',
+          false,
+        ),
+    }
   }, [])
 
   const { controls, run } = commands
@@ -536,8 +757,7 @@ export function usePlayback(
   function changeVolume(level: number) {
     const current = session.current
     if (!current) return
-    if (level > 0) current.lastVolume = level
-    current.player.setVolume(level, true)
+    current.setVolume(level)
   }
 
   function changeCaptions(enabled: boolean) {
@@ -547,24 +767,20 @@ export function usePlayback(
   }
 
   function selectTrack(kind: 'audio' | 'subtitles', id: number) {
-    void run(
-      'track',
-      `Could not switch ${kind === 'audio' ? 'audio' : 'subtitle'} tracks.`,
-      async (current) => {
-        const { player } = current
-        if (kind === 'audio') {
-          if (id !== player.getSelectedAudioStreamId())
-            await player.selectAudio(id)
-          if (id !== player.getSelectedAudioStreamId()) throw new Error()
-          current.syncTracks()
-        } else {
-          if (id !== player.getSelectedSubtitleStreamId())
-            await player.selectSubtitle(id)
-          if (id !== player.getSelectedSubtitleStreamId()) throw new Error()
-          current.syncTracks(true)
-        }
-      },
-    ).catch(() => {})
+    if (kind === 'audio') {
+      const track = session.current?.media?.audio.find(
+        (track) => track.id === id,
+      )
+      if (track) void controls.selectAudio(track.streamIndex).catch(() => {})
+      return
+    }
+    void run('track', 'Could not switch subtitle tracks.', async (current) => {
+      const { player } = current
+      if (id !== player.getSelectedSubtitleStreamId())
+        await player.selectSubtitle(id)
+      if (id !== player.getSelectedSubtitleStreamId()) throw new Error()
+      current.syncTracks(true)
+    }).catch(() => {})
   }
 
   return {
@@ -578,6 +794,8 @@ export function usePlayback(
     busy,
     notice,
     ...tracks,
+    subtitleClock: commands.subtitleClock,
+    reportSubtitleError: commands.reportSubtitleError,
     delay,
     volume,
     rate,
@@ -593,12 +811,10 @@ export function usePlayback(
       if (!player || player.isLive()) return
       player.setPlaybackRate(value)
       setRate(player.getPlaybackRate())
+      session.current?.publishState()
     },
     changeDelay(value: number) {
-      const player = session.current?.player
-      if (!player) return
-      player.setSubtitleDelay(value)
-      setDelay(player.getSubtitleDelay())
+      session.current?.setSubtitleDelay(value)
     },
   }
 }

@@ -1,6 +1,9 @@
 import { type RefObject, useEffect, useState } from 'react'
 
-type Player = import('@libmedia/avplayer/AVPlayer').default
+type Player = Pick<
+  import('@libmedia/avplayer/AVPlayer').default,
+  'currentTime' | 'isMSE'
+>
 
 export interface BufferedRange {
   start: number

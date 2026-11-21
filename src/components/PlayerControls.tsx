@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import type { MediaInfo, PlaybackState } from '../usePlayback'
 import { PlayButton, VolumeSlider } from './PlaybackButtons'
-import { clock, type PanelPage } from './player-ui'
+import { clock, type PanelPage, usePlayerLabels } from './player-ui'
 import { Timeline } from './Timeline'
 
 interface ControlsProps {
@@ -44,13 +44,14 @@ export function PlayerControls({
   onFullscreen,
   onPanel,
 }: ControlsProps) {
+  const labels = usePlayerLabels()
   const { duration, chapters, live } = media
   const { status, busy, volume, captions, selectedSubtitle } = playback
   const VolumeIcon = volume > 0 ? Volume2 : VolumeX
   const FullscreenIcon = fullscreen ? Minimize : Maximize
   const settingsOpen = page !== undefined && page !== 'chapters'
   const timeDisplay = live ? (
-    'Live'
+    labels.live
   ) : (
     <span className="lmp-clock">
       {clock(time)}
@@ -84,12 +85,12 @@ export function PlayerControls({
           <button
             className="lmp-button lmp-next-episode"
             type="button"
-            aria-label="Next episode"
-            title="Next episode"
+            aria-label={labels.nextEpisode}
+            title={labels.nextEpisode}
             onClick={() => onNextEpisode()}
           >
             <SkipForward aria-hidden="true" />
-            <span>Next episode</span>
+            <span>{labels.nextEpisode}</span>
           </button>
         )}
         {media.audio.length > 0 && (
@@ -97,7 +98,7 @@ export function PlayerControls({
             <button
               className="lmp-button"
               type="button"
-              aria-label={volume > 0 ? 'Mute' : 'Unmute'}
+              aria-label={volume > 0 ? labels.mute : labels.unmute}
               onClick={playback.toggleMute}
             >
               <VolumeIcon aria-hidden="true" />
@@ -112,8 +113,8 @@ export function PlayerControls({
           <button
             className="lmp-time lmp-button"
             type="button"
-            aria-label="Chapters"
-            title="Chapters"
+            aria-label={labels.chapters}
+            title={labels.chapters}
             aria-expanded={page === 'chapters'}
             aria-controls={panelId}
             onClick={(event) => onPanel('chapters', event.currentTarget)}
@@ -135,20 +136,22 @@ export function PlayerControls({
             <button
               className="lmp-button lmp-cc"
               type="button"
-              aria-label="Subtitles"
-              title="Subtitles"
+              aria-label={labels.subtitles}
+              title={labels.subtitles}
               aria-pressed={captions}
               onClick={() => playback.changeCaptions(!captions)}
             >
               <Captions aria-hidden="true" />
             </button>
           )}
-          {(!live || playback.selectedAudio || selectedSubtitle) && (
+          {(!live ||
+            (media.audio.length > 0 && status !== 'ready') ||
+            selectedSubtitle) && (
             <button
               className="lmp-button"
               type="button"
-              aria-label="Settings"
-              title="Settings"
+              aria-label={labels.settings}
+              title={labels.settings}
               aria-expanded={settingsOpen}
               aria-controls={panelId}
               onClick={(event) => onPanel('settings', event.currentTarget)}
@@ -161,7 +164,7 @@ export function PlayerControls({
           <button
             className="lmp-button"
             type="button"
-            aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            aria-label={fullscreen ? labels.exitFullscreen : labels.fullscreen}
             onClick={onFullscreen}
           >
             <FullscreenIcon aria-hidden="true" />

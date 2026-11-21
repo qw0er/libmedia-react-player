@@ -1,10 +1,25 @@
-import type { Ref } from 'react'
+import type { CSSProperties, Ref } from 'react'
 
-export interface ExternalSubtitleTrack {
-  src: string
+interface ExternalSubtitleOptions {
   label?: string
   language?: string
+  /** Positive values show cues later. This is added to the player's subtitle delay. */
+  offsetMs?: number
 }
+
+export type ExternalSubtitleTrack = ExternalSubtitleOptions &
+  (
+    | { src: string; content?: never; format?: never; renderer?: 'native' }
+    | { content: Blob; format: string; src?: never; renderer?: 'native' }
+    | {
+        /** A complete ASS/SSA script, including all cue times and styles. */
+        content: Blob
+        format: 'ass' | 'ssa'
+        renderer: 'styled'
+        fonts?: readonly Blob[]
+        src?: never
+      }
+  )
 
 export interface LibmediaRequestOptions {
   headers?: Readonly<Record<string, string>>
@@ -31,10 +46,16 @@ export interface LibmediaPlaybackState {
   src: string
   status: LibmediaPlaybackStatus
   buffering: boolean
+  playbackRate: number
+  seeking: boolean
 }
 
 export interface LibmediaSeekEvent extends LibmediaPlaybackProgress {
   requestedPositionMs: number
+}
+
+export interface LibmediaInitialPositionResult extends LibmediaSeekEvent {
+  restored: boolean
 }
 
 export interface LibmediaTrack {
@@ -44,9 +65,17 @@ export interface LibmediaTrack {
   language?: string
 }
 
+export interface LibmediaAudioTrack extends LibmediaTrack {
+  /** Demuxed stream index in the loaded file, before filtering by track type. */
+  streamIndex: number
+}
+
+/** Select a file stream index, or pass null for silence at the current volume. */
+export type LibmediaAudioSelection = number | null
+
 export interface LibmediaTrackChangeEvent {
   src: string
-  audio: LibmediaTrack | null
+  audio: LibmediaAudioTrack | null
   /** Null when subtitles are off or no supported track is selected. */
   subtitle: LibmediaTrack | null
 }
@@ -63,6 +92,7 @@ export interface LibmediaPlayerHandle {
   pause(): Promise<void>
   /** Returns the settled position in milliseconds. Before playback, this is the prepared start position. */
   seekTo(positionMs: number): Promise<number>
+  selectAudio(selection: LibmediaAudioSelection): Promise<void>
 }
 
 export interface LibmediaPlayerEvents {
@@ -71,6 +101,8 @@ export interface LibmediaPlayerEvents {
   onTimeUpdate?: (event: LibmediaPlaybackProgress) => void
   onPlaybackStateChange?: (event: LibmediaPlaybackState) => void
   onSeeked?: (event: LibmediaSeekEvent) => void
+  /** Reports the outcome of a supplied initialPositionMs before onReady. */
+  onInitialPositionResult?: (event: LibmediaInitialPositionResult) => void
   /** Reports the initial selection when playback starts and subsequent changes. */
   onTrackChange?: (event: LibmediaTrackChangeEvent) => void
   onEnded?: (event: LibmediaPlaybackProgress) => void
@@ -87,6 +119,43 @@ export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   externalSubtitles?: readonly ExternalSubtitleTrack[]
   /** Applied once when the source loads. Use seekTo to change position later. */
   initialPositionMs?: number
+  /** Applied once per source. Omit to use AVPlayer's default selection. */
+  initialAudio?: LibmediaAudioSelection
+  labels?: Partial<LibmediaControlLabels>
+  /** Additional CSS class for the player root. */
+  className?: string
+  /** Inline CSS styles for the player root. */
+  style?: CSSProperties
   /** Shows the Next episode button and handles its activation. */
   onNextEpisode?: () => void
+}
+
+export interface LibmediaControlLabels {
+  player: string
+  play: string
+  pause: string
+  replay: string
+  nextEpisode: string
+  skipBackward: string
+  skipForward: string
+  seek: string
+  mute: string
+  unmute: string
+  volume: string
+  live: string
+  subtitles: string
+  settings: string
+  fullscreen: string
+  exitFullscreen: string
+  audio: string
+  playbackSpeed: string
+  chapters: string
+  previousChapter: string
+  nextChapter: string
+  closeMenu: string
+  backToSettings: string
+  off: string
+  subtitleDelay: string
+  decreaseSubtitleDelay: string
+  increaseSubtitleDelay: string
 }

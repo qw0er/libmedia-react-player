@@ -9,13 +9,24 @@ import {
 import { CenterControls } from './components/PlaybackButtons'
 import { PlayerControls } from './components/PlayerControls'
 import { PlayerPanel } from './components/PlayerPanel'
-import { type PanelPage, seekStepMs } from './components/player-ui'
+import {
+  defaultLabels,
+  type PanelPage,
+  PlayerLabels,
+  seekStepMs,
+  usePlayerLabels,
+} from './components/player-ui'
+import { StyledSubtitles } from './components/StyledSubtitles'
 import styles from './player.css?inline'
 import type { LibmediaPlayerProps } from './player-api'
 import { usePlayback } from './usePlayback'
 
 export type {
   ExternalSubtitleTrack,
+  LibmediaAudioSelection,
+  LibmediaAudioTrack,
+  LibmediaControlLabels,
+  LibmediaInitialPositionResult,
   LibmediaPlaybackProgress,
   LibmediaPlaybackState,
   LibmediaPlaybackStatus,
@@ -34,6 +45,7 @@ export function LibmediaPlayer({
   sourceFormat,
   mediaRequest,
   externalSubtitles = [],
+  labels,
   ...props
 }: LibmediaPlayerProps) {
   const teardown = useRef(Promise.resolve())
@@ -45,26 +57,43 @@ export function LibmediaPlayer({
   const signature = JSON.stringify([
     src,
     format,
-    externalSubtitles.map(({ src, label, language }) => [src, label, language]),
+    externalSubtitles.map((track) => [
+      track.src,
+      track.format,
+      track.label,
+      track.language,
+      track.offsetMs,
+      track.renderer,
+      track.renderer === 'styled' ? track.fonts?.length : undefined,
+    ]),
     mediaRequest?.credentials,
     headers,
   ])
   // Use a revision as the React key so URLs and credentials stay out of it.
-  const [source, setSource] = useState({ signature, revision: 0 })
-  if (signature !== source.signature) {
-    setSource({ signature, revision: source.revision + 1 })
+  const contents = externalSubtitles.flatMap((track) => [
+    track.content,
+    ...(track.renderer === 'styled' ? (track.fonts ?? []) : []),
+  ])
+  const [source, setSource] = useState({ signature, contents, revision: 0 })
+  if (
+    signature !== source.signature ||
+    contents.some((content, index) => content !== source.contents[index])
+  ) {
+    setSource({ signature, contents, revision: source.revision + 1 })
   }
 
   return (
-    <Playback
-      key={source.revision}
-      {...props}
-      src={src}
-      sourceFormat={format}
-      mediaRequest={mediaRequest}
-      externalSubtitles={externalSubtitles}
-      teardown={teardown}
-    />
+    <PlayerLabels value={{ ...defaultLabels, ...labels }}>
+      <Playback
+        key={source.revision}
+        {...props}
+        src={src}
+        sourceFormat={format}
+        mediaRequest={mediaRequest}
+        externalSubtitles={externalSubtitles}
+        teardown={teardown}
+      />
+    </PlayerLabels>
   )
 }
 
@@ -74,6 +103,9 @@ function Playback({
   mediaRequest,
   externalSubtitles = [],
   initialPositionMs,
+  initialAudio,
+  className,
+  style,
   onNextEpisode,
   ref,
   teardown,
@@ -91,19 +123,30 @@ function Playback({
       : undefined,
   )
   const [initialPosition] = useState(initialPositionMs)
+  const [audio] = useState(initialAudio)
+  const labels = usePlayerLabels()
   const playback = usePlayback(
     src,
     sourceFormat,
     request,
     subtitleSources,
     initialPosition,
+    audio,
     teardown,
     events,
   )
   const { controls } = playback
   useImperativeHandle(ref, () => controls, [controls])
-  const { media, status, position, busy, notice, captions, selectedSubtitle } =
-    playback
+  const {
+    media,
+    status,
+    position,
+    busy,
+    notice,
+    captions,
+    selectedSubtitle,
+    styledSubtitle,
+  } = playback
   const root = useRef<HTMLElement>(null)
   const panelTrigger = useRef<HTMLButtonElement | null>(null)
   const panelId = useId()
@@ -190,9 +233,10 @@ function Playback({
       ref={root}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: Focus scopes shortcuts to this player.
       tabIndex={0}
-      aria-label="Video player"
+      aria-label={labels.player}
       aria-busy={status === 'loading' || status === 'starting' || buffering}
-      className="libmedia-player"
+      className={className ? `libmedia-player ${className}` : 'libmedia-player'}
+      style={style}
       data-visible={visible}
       data-panel-open={panelOpen}
       onBlur={(event) => {
@@ -205,7 +249,7 @@ function Playback({
           setPanelOpen(false)
         }
       }}
-      data-captions={captions}
+      data-captions={captions && !styledSubtitle}
       data-status={status}
       onPointerDown={(event) => {
         pointerType.current = event.pointerType
@@ -253,13 +297,23 @@ function Playback({
         {styles}
       </style>
       <div className="lmp-viewport" ref={playback.viewport} />
+      {styledSubtitle && selectedSubtitle && media && (
+        <StyledSubtitles
+          key={selectedSubtitle.id}
+          track={styledSubtitle}
+          videoAspectRatio={media.videoAspectRatio}
+          visible={captions}
+          clock={playback.subtitleClock}
+          onError={playback.reportSubtitleError}
+        />
+      )}
 
       {loaded && (playing || status === 'paused') && (
         <button
           className="lmp-surface"
           type="button"
           tabIndex={-1}
-          aria-label={playing ? 'Pause' : 'Play'}
+          aria-label={playing ? labels.pause : labels.play}
           onClick={() => {
             if (pointerType.current === 'touch') {
               if (visible) {

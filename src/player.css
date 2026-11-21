@@ -8,8 +8,6 @@
   position: relative;
   container-type: inline-size;
   isolation: isolate;
-  width: 100%;
-  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #000;
   color: #fff;
@@ -17,6 +15,11 @@
   font:
     400 14px / 1.4 system-ui,
     sans-serif;
+}
+
+:where(.libmedia-player) {
+  width: 100%;
+  aspect-ratio: 16 / 9;
 }
 
 .libmedia-player:fullscreen {
@@ -38,6 +41,18 @@
 }
 
 .libmedia-player[data-captions="false"] .lmp-viewport > :is(.ASS-box, svg) {
+  visibility: hidden;
+}
+
+.lmp-styled-subtitles {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.lmp-styled-subtitles[data-visible="false"] {
   visibility: hidden;
 }
 

@@ -1,12 +1,33 @@
 import playerSource from 'virtual:libmedia-player-source'
+import subtitleSource from 'virtual:libmedia-subtitle-source'
 
-type PlayerModule = typeof import('@libmedia/avplayer/AVPlayer')
+type UpstreamModule = typeof import('@libmedia/avplayer/AVPlayer')
+type UpstreamPlayer = InstanceType<UpstreamModule['default']>
+type UpstreamOptions = ConstructorParameters<UpstreamModule['default']>[0]
+type StreamSelector = NonNullable<UpstreamOptions['findBestStream']>
+
+// The Vite adapter preserves AVPlayer's defaults and exposes the demux seek result.
+export type BundledPlayer = Omit<UpstreamPlayer, 'seek'> & {
+  seek(timestamp: bigint): Promise<bigint | null | undefined>
+}
+type PlayerModule = Omit<UpstreamModule, 'default'> & {
+  default: new (
+    options: Omit<UpstreamOptions, 'findBestStream'> & {
+      findBestStream?: (
+        ...args: Parameters<StreamSelector>
+      ) => ReturnType<StreamSelector> | undefined
+    },
+  ) => BundledPlayer
+}
 type BundledPlayerModule = PlayerModule & {
   setLibmediaWasmLoader(loader: typeof loadWasm): void
 }
 
 const chunks = import.meta.glob<string>(
-  '../vendor/libmedia/player/*.avplayer.js',
+  [
+    '../vendor/libmedia/player/*.avplayer.js',
+    '!../vendor/libmedia/player/630.avplayer.js',
+  ],
   {
     eager: true,
     import: 'default',
@@ -52,6 +73,9 @@ async function importPlayer(): Promise<PlayerModule> {
         URL.createObjectURL(new Blob([source], { type: 'text/javascript' })),
       ]
     }),
+  )
+  chunkUrls['630'] = URL.createObjectURL(
+    new Blob([subtitleSource], { type: 'text/javascript' }),
   )
   const entry = URL.createObjectURL(
     new Blob(

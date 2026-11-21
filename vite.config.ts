@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
@@ -18,7 +19,24 @@ export default defineConfig(({ command }) => {
   ]
   if (command === 'build') {
     return {
-      plugins,
+      plugins: [
+        ...plugins,
+        {
+          name: 'jassub-license',
+          async generateBundle() {
+            const license = new URL(
+              'LICENSE',
+              import.meta.resolve('jassub/package.json'),
+            )
+            this.emitFile({
+              type: 'asset',
+              fileName: 'JASSUB-LICENSE',
+              source: await readFile(license, 'utf8'),
+            })
+          },
+        },
+      ],
+      base: './',
       publicDir: false,
       build: {
         lib: {
@@ -35,6 +53,7 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins,
+    optimizeDeps: { exclude: ['jassub'] },
     server: { headers: isolationHeaders },
   }
 })

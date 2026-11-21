@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import type { MediaInfo, PlaybackState } from '../usePlayback'
 import { VolumeSlider } from './PlaybackButtons'
-import type { PanelPage } from './player-ui'
+import { type PanelPage, usePlayerLabels } from './player-ui'
 
 type Setting = Exclude<PanelPage, 'settings' | 'chapters'>
 const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -55,6 +55,7 @@ export function SettingsHome({
   media: MediaInfo
   onPage: (page: Setting) => void
 }) {
+  const labels = usePlayerLabels()
   const {
     selectedAudio,
     selectedSubtitle,
@@ -65,11 +66,11 @@ export function SettingsHome({
   } = playback
   return (
     <>
-      {selectedAudio && (
+      {media.audio.length > 0 && playback.status !== 'ready' && (
         <SettingLink
           icon={Headphones}
-          label="Audio"
-          value={selectedAudio.label}
+          label={labels.audio}
+          value={selectedAudio?.label ?? labels.off}
           page="audio"
           onPage={onPage}
         />
@@ -77,8 +78,8 @@ export function SettingsHome({
       {selectedSubtitle && (
         <SettingLink
           icon={Captions}
-          label="Subtitles"
-          value={captions ? selectedSubtitle.label : 'Off'}
+          label={labels.subtitles}
+          value={captions ? selectedSubtitle.label : labels.off}
           page="subtitles"
           onPage={onPage}
         />
@@ -86,7 +87,7 @@ export function SettingsHome({
       {!media.live && (
         <SettingLink
           icon={Gauge}
-          label="Playback speed"
+          label={labels.playbackSpeed}
           value={`${rate}×`}
           page="speed"
           onPage={onPage}
@@ -95,7 +96,7 @@ export function SettingsHome({
       {media.audio.length > 0 && (
         <div className="lmp-touch-volume">
           <Volume2 className="lmp-setting-icon" aria-hidden="true" />
-          Volume
+          {labels.volume}
           <VolumeSlider volume={volume} changeVolume={changeVolume} />
         </div>
       )}
@@ -140,6 +141,7 @@ export function TrackList({
   tracks: MediaInfo['audio']
   playback: PlaybackState
 }) {
+  const labels = usePlayerLabels()
   const { captions, selectedAudio, selectedSubtitle } = playback
   const selectedId =
     kind === 'audio'
@@ -151,9 +153,19 @@ export function TrackList({
     <>
       {kind === 'subtitles' && (
         <TrackChoice
-          label="Off"
+          label={labels.off}
           selected={!captions}
           onSelect={() => playback.changeCaptions(false)}
+        />
+      )}
+      {kind === 'audio' && (
+        <TrackChoice
+          label={labels.off}
+          selected={!selectedAudio}
+          busy={playback.busy}
+          onSelect={() =>
+            void playback.controls.selectAudio(null).catch(() => {})
+          }
         />
       )}
       {tracks.map((track) => (
@@ -174,14 +186,15 @@ export function SubtitleDelay({
   delay,
   changeDelay,
 }: Pick<PlaybackState, 'delay' | 'changeDelay'>) {
+  const labels = usePlayerLabels()
   return (
     <div className="lmp-delay">
-      <span>Subtitle delay</span>
+      <span>{labels.subtitleDelay}</span>
       <div className="lmp-stepper">
         <button
           className="lmp-button"
           type="button"
-          aria-label="Decrease subtitle delay"
+          aria-label={labels.decreaseSubtitleDelay}
           onClick={() => changeDelay(delay - 100)}
         >
           <Minus aria-hidden="true" />
@@ -193,7 +206,7 @@ export function SubtitleDelay({
         <button
           className="lmp-button"
           type="button"
-          aria-label="Increase subtitle delay"
+          aria-label={labels.increaseSubtitleDelay}
           onClick={() => changeDelay(delay + 100)}
         >
           <Plus aria-hidden="true" />

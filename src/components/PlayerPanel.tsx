@@ -2,21 +2,13 @@ import { ChevronLeft, SkipBack, SkipForward, X } from 'lucide-react'
 import { useLayoutEffect, useRef } from 'react'
 import type { MediaInfo, PlaybackState } from '../usePlayback'
 import { ChapterList } from './ChapterList'
-import type { PanelPage } from './player-ui'
+import { type PanelPage, usePlayerLabels } from './player-ui'
 import {
   SettingsHome,
   SpeedChoices,
   SubtitleDelay,
   TrackList,
 } from './SettingsPanel'
-
-const titles: Record<PanelPage, string> = {
-  settings: 'Settings',
-  audio: 'Audio',
-  subtitles: 'Subtitles',
-  speed: 'Playback speed',
-  chapters: 'Chapters',
-}
 
 interface PanelProps {
   id: string
@@ -39,6 +31,7 @@ export function PlayerPanel({
   onPage,
   onClose,
 }: PanelProps) {
+  const labels = usePlayerLabels()
   const panel = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
   const returnLink = useRef<PanelPage | undefined>(undefined)
@@ -79,7 +72,7 @@ export function PlayerPanel({
       <button
         className="lmp-scrim"
         type="button"
-        aria-label="Close player menu"
+        aria-label={labels.closeMenu}
         tabIndex={-1}
         inert={!open}
         data-open={open}
@@ -100,7 +93,7 @@ export function PlayerPanel({
             <button
               className="lmp-button"
               type="button"
-              aria-label="Back to settings"
+              aria-label={labels.backToSettings}
               onClick={() => {
                 returnLink.current = page
                 onPage('settings')
@@ -109,13 +102,15 @@ export function PlayerPanel({
               <ChevronLeft aria-hidden="true" />
             </button>
           )}
-          <h2 id={`${id}-title`}>{titles[page]}</h2>
+          <h2 id={`${id}-title`}>
+            {page === 'speed' ? labels.playbackSpeed : labels[page]}
+          </h2>
           {page === 'chapters' && (
             <div className="lmp-chapter-actions">
               <button
                 className="lmp-button"
                 type="button"
-                aria-label="Previous chapter"
+                aria-label={labels.previousChapter}
                 disabled={playback.busy || chapterIndex <= 0}
                 onClick={() => jump(chapterIndex - 1)}
               >
@@ -124,7 +119,7 @@ export function PlayerPanel({
               <button
                 className="lmp-button"
                 type="button"
-                aria-label="Next chapter"
+                aria-label={labels.nextChapter}
                 disabled={
                   playback.busy || chapterIndex + 1 >= media.chapters.length
                 }
@@ -137,7 +132,7 @@ export function PlayerPanel({
           <button
             className="lmp-button"
             type="button"
-            aria-label="Close menu"
+            aria-label={labels.closeMenu}
             onClick={onClose}
           >
             <X aria-hidden="true" />
