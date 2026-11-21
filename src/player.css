@@ -197,6 +197,15 @@
   pointer-events: none;
 }
 
+.libmedia-player[data-visible="false"]:not(
+  :focus-visible,
+  :has(:focus-visible)
+),
+.libmedia-player[data-visible="false"]:not(:focus-visible, :has(:focus-visible))
+  .lmp-surface {
+  cursor: none;
+}
+
 .lmp-row,
 .lmp-options,
 .lmp-volume {
