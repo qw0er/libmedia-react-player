@@ -1,7 +1,10 @@
+@import "./components/panel.css";
+
 .libmedia-player {
   --lmp-accent: var(--libmedia-player-accent, #fff);
   --lmp-muted: #b6bbc4;
-  --lmp-panel: #15171c;
+  --lmp-panel: #191c23;
+  --lmp-highlight: var(--libmedia-player-accent, #b6d4ff);
   position: relative;
   container-type: inline-size;
   isolation: isolate;
@@ -60,20 +63,32 @@
   outline-offset: -2px;
 }
 
-.libmedia-player .lmp-center {
+.lmp-center-controls {
   position: absolute;
   top: 50%;
   left: 50%;
   display: grid;
-  place-items: center;
-  width: clamp(48px, 9cqw, 68px);
-  aspect-ratio: 1;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: clamp(6px, 3cqw, 20px);
   transform: translate(-50%, -50%);
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+
+.libmedia-player .lmp-center-controls button {
+  place-items: center;
+  aspect-ratio: 1;
   border-radius: 50%;
   background: rgb(14 15 18 / 80%);
-  transition:
-    opacity 150ms ease,
-    background 150ms ease;
+  transition: background 150ms ease;
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+
+.libmedia-player .lmp-center {
+  display: grid;
+  width: clamp(48px, 9cqw, 68px);
 }
 
 .lmp-center svg {
@@ -81,13 +96,39 @@
   height: 60%;
 }
 
-.libmedia-player .lmp-center:hover {
+.libmedia-player
+  .lmp-center-controls
+  button:not(:disabled, [aria-disabled="true"]):is(:hover, :active) {
   background: rgb(35 37 43 / 95%);
 }
 
+.libmedia-player .lmp-skip {
+  display: var(--lmp-touch-transport, none);
+  width: clamp(44px, 8cqw, 52px);
+}
+
+.lmp-skip > * {
+  grid-area: 1 / 1;
+}
+
+.lmp-skip svg {
+  width: 27px;
+  height: 27px;
+}
+
+.lmp-skip span {
+  padding-top: 2px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
 .libmedia-player:is([data-status="playing"], [data-status="paused"])
-  .lmp-center {
-  display: none;
+  .lmp-center-controls {
+  display: var(--lmp-touch-transport, none);
+}
+
+.libmedia-player[data-panel-open="true"] .lmp-center-controls {
+  visibility: hidden;
 }
 
 .lmp-message,
@@ -117,15 +158,20 @@
 
 .lmp-controls {
   position: absolute;
+  z-index: 2;
   inset: auto 0 0;
-  padding: 16px 12px 4px;
+  padding: 20px clamp(10px, 1.6cqw, 22px) 6px;
   background: linear-gradient(transparent, rgb(0 0 0 / 82%));
   transition: opacity 150ms ease;
 }
 
 .libmedia-player[data-visible="false"]:not(:focus-visible, :has(:focus-visible))
-  :is(.lmp-controls, .lmp-center) {
+  :is(.lmp-controls, .lmp-center-controls) {
   opacity: 0;
+}
+
+.libmedia-player[data-visible="false"]:not(:focus-visible, :has(:focus-visible))
+  :is(.lmp-controls, .lmp-center-controls button) {
   pointer-events: none;
 }
 
@@ -137,7 +183,7 @@
 }
 
 .lmp-row {
-  gap: 2px;
+  gap: 4px;
 }
 
 .lmp-spacer {
@@ -151,7 +197,12 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: 6px;
+  border-radius: 9px;
+}
+
+.lmp-button svg {
+  width: 21px;
+  height: 21px;
 }
 
 .libmedia-player .lmp-button:is(:hover, [aria-expanded="true"]) {
@@ -195,19 +246,31 @@
 .libmedia-player .lmp-time {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   width: auto;
+  min-width: 0;
+  flex-shrink: 1;
   padding-inline: 8px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.lmp-time span,
+.lmp-duration,
+.lmp-current-chapter,
 .lmp-time svg {
   color: var(--lmp-muted);
 }
 
+.lmp-current-chapter {
+  overflow: hidden;
+  max-width: 24cqw;
+  padding-left: 9px;
+  border-left: 1px solid rgb(255 255 255 / 26%);
+  text-overflow: ellipsis;
+}
+
 .lmp-time svg {
+  flex: none;
   width: 14px;
   height: 14px;
 }
@@ -299,107 +362,11 @@
   white-space: nowrap;
 }
 
-.lmp-panel {
-  position: absolute;
-  z-index: 2;
-  right: 12px;
-  bottom: 76px;
-  box-sizing: border-box;
-  width: min(300px, 100% - 24px);
-  max-height: min(360px, 100% - 90px);
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 0 4px 4px;
-  border: 1px solid rgb(255 255 255 / 15%);
-  border-radius: 9px;
-  background: var(--lmp-panel);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 36%);
-}
-
-.lmp-panel[data-panel="chapters"] {
-  right: auto;
-  left: 12px;
-}
-
-.lmp-panel-header,
-.lmp-caption-delay,
-.lmp-chapter-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.lmp-panel-header {
-  position: sticky;
-  z-index: 1;
-  top: 0;
-  padding-left: 8px;
-  border-bottom: 1px solid rgb(255 255 255 / 12%);
-  background: var(--lmp-panel);
-  font-weight: 600;
-}
-
-.lmp-panel-header span,
-.lmp-caption-delay span {
-  flex: 1;
-}
-
-.lmp-panel-header .lmp-button {
-  height: 38px;
-}
-
-.libmedia-player .lmp-choice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 42px;
-  padding: 7px 8px;
-  border-radius: 6px;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-
-.lmp-choice span,
-.lmp-choice svg,
-.lmp-touch-volume input {
-  margin-inline-start: auto;
-}
-
-.lmp-choice span,
-.lmp-caption-delay output {
-  color: var(--lmp-muted);
-}
-
-.lmp-choice svg {
-  flex: none;
-  width: 16px;
-  height: 16px;
-}
-
-.libmedia-player
-  .lmp-choice:is(:hover, [aria-current="true"], [aria-pressed="true"]) {
-  background: rgb(255 255 255 / 10%);
-}
-
-.lmp-caption-delay {
-  padding-left: 8px;
-  border-bottom: 1px solid rgb(255 255 255 / 12%);
-}
-
-.lmp-caption-delay .lmp-button {
-  font-size: 18px;
-}
-
-.lmp-chapter-actions {
-  justify-content: flex-end;
-}
-
-.libmedia-player .lmp-touch-volume {
-  display: none;
-}
-
 @container (max-width: 480px) {
+  .lmp-center-controls {
+    --lmp-touch-transport: grid;
+  }
+
   .libmedia-player .lmp-controls {
     inset: 0;
     display: flex;
@@ -411,6 +378,10 @@
       linear-gradient(transparent, rgb(0 0 0 / 82%)) bottom / 100% 84px
       no-repeat;
     pointer-events: none;
+  }
+
+  .lmp-current-chapter {
+    max-width: none;
   }
 
   .lmp-timeline {
@@ -436,31 +407,26 @@
     display: none;
   }
 
-  .libmedia-player:is([data-status="playing"], [data-status="paused"])
-    .lmp-center {
-    display: grid;
+  .libmedia-player[data-panel-open="true"] .lmp-controls {
+    visibility: hidden;
+  }
+}
+
+@media (pointer: coarse) {
+  .lmp-center-controls {
+    --lmp-touch-transport: grid;
   }
 
-  .libmedia-player .lmp-touch-volume {
-    display: flex;
-  }
-
-  .libmedia-player .lmp-panel {
-    right: 6px;
-    bottom: 6px;
-    left: 6px;
-    width: auto;
-    max-height: calc(100% - 54px);
-  }
-
-  .lmp-panel-header .lmp-button,
-  .libmedia-player .lmp-choice {
-    min-height: 44px;
+  .libmedia-player .lmp-transport {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .libmedia-player * {
-    transition: none;
+  .libmedia-player *,
+  .libmedia-player *::after {
+    transition-duration: 0s;
+    transition-delay: 0s;
+    animation: none;
   }
 }

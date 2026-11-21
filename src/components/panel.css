@@ -1,0 +1,319 @@
+.libmedia-player .lmp-scrim {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+}
+
+.lmp-panel,
+.libmedia-player .lmp-scrim {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lmp-panel {
+  --lmp-edge: clamp(10px, 1.6cqw, 22px);
+  --lmp-lift: 8px;
+  position: absolute;
+  z-index: 4;
+  right: var(--lmp-edge);
+  bottom: 78px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(332px, 100% - 2 * var(--lmp-edge));
+  max-height: min(408px, 100% - 78px - var(--lmp-edge));
+  overflow: hidden;
+  transform: translateY(var(--lmp-lift)) scale(0.98);
+  transform-origin: bottom right;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 14px;
+  background: var(--lmp-panel);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 42%);
+}
+
+.lmp-panel[data-panel="chapters"] {
+  right: auto;
+  left: var(--lmp-edge);
+  transform-origin: bottom left;
+}
+
+.lmp-panel[data-open="true"],
+.libmedia-player .lmp-scrim[data-open="true"] {
+  visibility: visible;
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+.lmp-panel-header,
+.lmp-delay {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 16px;
+}
+
+.lmp-panel-header {
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+
+.lmp-panel-header:has(> button:first-child) {
+  padding-left: 6px;
+}
+
+.lmp-panel-header h2 {
+  flex: 1;
+  margin: 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.libmedia-player .lmp-panel .lmp-button {
+  width: 36px;
+  height: 36px;
+  color: var(--lmp-muted);
+}
+
+.lmp-panel .lmp-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.lmp-chapter-actions {
+  display: flex;
+  padding-right: 4px;
+  border-right: 1px solid rgb(255 255 255 / 12%);
+}
+
+.lmp-panel-body {
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #555c68 transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lmp-panel,
+  .libmedia-player .lmp-scrim {
+    transition:
+      opacity 150ms ease,
+      transform 180ms cubic-bezier(0.2, 0.75, 0.25, 1),
+      visibility 0s linear 180ms;
+  }
+
+  .lmp-panel[data-open="true"] .lmp-panel-body {
+    animation: lmp-panel-page 160ms ease-out;
+  }
+}
+
+.lmp-panel[data-panel="settings"] {
+  --lmp-page-shift: -6px;
+}
+
+@keyframes lmp-panel-page {
+  from {
+    transform: translateX(var(--lmp-page-shift, 6px));
+    opacity: 0;
+  }
+}
+
+.libmedia-player :is(.lmp-setting, .lmp-choice, .lmp-touch-volume) {
+  display: grid;
+  align-items: center;
+  column-gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.lmp-setting {
+  grid-template-columns: 21px auto minmax(0, 1fr) 14px;
+}
+
+.lmp-setting-icon {
+  width: 18px;
+  height: 18px;
+  color: #d6dae2;
+}
+
+.lmp-setting-value {
+  overflow: hidden;
+  color: var(--lmp-muted);
+  font-size: 13px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lmp-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--lmp-muted);
+}
+
+.lmp-choice {
+  grid-template-columns: minmax(0, 1fr) auto 18px;
+}
+
+.lmp-choice-label {
+  overflow-wrap: anywhere;
+}
+
+.lmp-language,
+.lmp-chapter-time {
+  color: var(--lmp-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lmp-language {
+  max-width: 8ch;
+  overflow-wrap: anywhere;
+}
+
+.lmp-check {
+  grid-column: 3;
+  width: 17px;
+  height: 17px;
+  color: var(--lmp-highlight);
+}
+
+.lmp-chapter {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.libmedia-player :is(.lmp-choice, .lmp-setting, .lmp-speed):enabled:hover {
+  background: rgb(255 255 255 / 8%);
+}
+
+.libmedia-player
+  :is(.lmp-choice, .lmp-speed):is(
+    [aria-pressed="true"],
+    [aria-current="true"]
+  ) {
+  background: color-mix(in srgb, var(--lmp-highlight) 14%, transparent);
+  color: var(--lmp-highlight);
+}
+
+.lmp-choice[aria-current="true"] {
+  box-shadow: inset 3px 0 var(--lmp-highlight);
+}
+
+.lmp-speeds {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  padding: 2px;
+}
+
+.libmedia-player .lmp-speed {
+  min-height: 42px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.libmedia-player .lmp-speed[aria-pressed="true"] {
+  border-color: var(--lmp-highlight);
+}
+
+.lmp-delay {
+  justify-content: space-between;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+  font-size: 13px;
+}
+
+.lmp-stepper {
+  display: flex;
+  align-items: center;
+}
+
+.lmp-stepper output {
+  min-width: 6ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.libmedia-player .lmp-touch-volume {
+  display: none;
+}
+
+@container (max-width: 480px) {
+  .libmedia-player .lmp-scrim {
+    z-index: 3;
+    background: rgb(0 0 0 / 44%);
+  }
+
+  .libmedia-player .lmp-panel {
+    --lmp-lift: 18px;
+    inset: auto 6px 6px;
+    width: auto;
+    max-height: calc(100% - 12px);
+    transform-origin: bottom center;
+  }
+
+  .lmp-panel-header,
+  .lmp-delay {
+    padding-block: 0;
+  }
+
+  .lmp-panel .lmp-button,
+  .libmedia-player .lmp-speed {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .libmedia-player .lmp-touch-volume {
+    display: grid;
+    grid-template-columns: 21px auto minmax(0, 1fr);
+    border-top: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 0;
+  }
+
+  .lmp-touch-volume input {
+    justify-self: end;
+    width: min(100%, 140px);
+    margin: 0;
+  }
+}
+
+@container (300px <= width <= 480px) {
+  .lmp-panel[data-panel="settings"] .lmp-panel-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .libmedia-player :is(.lmp-setting, .lmp-touch-volume) {
+    grid-template-columns: 18px minmax(0, 1fr);
+    column-gap: 7px;
+    row-gap: 2px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: rgb(255 255 255 / 5%);
+  }
+
+  .lmp-setting-value,
+  .lmp-touch-volume input {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .lmp-setting .lmp-chevron {
+    display: none;
+  }
+}

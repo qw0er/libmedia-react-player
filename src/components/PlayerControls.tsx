@@ -1,0 +1,157 @@
+import {
+  Captions,
+  ChevronUp,
+  Maximize,
+  Minimize,
+  Settings,
+  Volume2,
+  VolumeX,
+} from 'lucide-react'
+import type { MediaInfo, PlaybackState } from '../usePlayback'
+import { PlayButton, VolumeSlider } from './PlaybackButtons'
+import { clock, type PanelPage } from './player-ui'
+import { Timeline } from './Timeline'
+
+interface ControlsProps {
+  playback: PlaybackState
+  media: MediaInfo
+  time: number
+  scrub?: number
+  chapterIndex: number
+  page?: PanelPage
+  panelId: string
+  fullscreen: boolean
+  onScrub: (time?: number) => void
+  onPlay: () => void
+  onFullscreen: () => void
+  onPanel: (page: 'chapters' | 'settings', trigger: HTMLButtonElement) => void
+}
+
+export function PlayerControls({
+  playback,
+  media,
+  time,
+  scrub,
+  chapterIndex,
+  page,
+  panelId,
+  fullscreen,
+  onScrub,
+  onPlay,
+  onFullscreen,
+  onPanel,
+}: ControlsProps) {
+  const { duration, chapters, live } = media
+  const { status, busy, volume, captions, selectedSubtitle } = playback
+  const VolumeIcon = volume > 0 ? Volume2 : VolumeX
+  const FullscreenIcon = fullscreen ? Minimize : Maximize
+  const settingsOpen = page !== undefined && page !== 'chapters'
+  const timeDisplay = live ? (
+    'Live'
+  ) : (
+    <span className="lmp-clock">
+      {clock(time)}
+      {duration > 0 && (
+        <span className="lmp-duration"> / {clock(duration)}</span>
+      )}
+    </span>
+  )
+
+  return (
+    <div className="lmp-controls">
+      {duration > 0 && (
+        <Timeline
+          chapters={chapters}
+          duration={duration}
+          time={time}
+          scrub={scrub}
+          onScrub={onScrub}
+          onSeek={playback.seek}
+        />
+      )}
+      <div className="lmp-row">
+        <PlayButton
+          className="lmp-button lmp-transport"
+          status={status}
+          disabled={busy || (status === 'playing' && live)}
+          onClick={onPlay}
+        />
+        {media.audio.length > 0 && (
+          <div className="lmp-volume">
+            <button
+              className="lmp-button"
+              type="button"
+              aria-label={volume > 0 ? 'Mute' : 'Unmute'}
+              onClick={playback.toggleMute}
+            >
+              <VolumeIcon aria-hidden="true" />
+            </button>
+            <VolumeSlider
+              volume={volume}
+              changeVolume={playback.changeVolume}
+            />
+          </div>
+        )}
+        {chapters.length > 0 && duration > 0 ? (
+          <button
+            className="lmp-time lmp-button"
+            type="button"
+            aria-label="Chapters"
+            title="Chapters"
+            aria-expanded={page === 'chapters'}
+            aria-controls={panelId}
+            onClick={(event) => onPanel('chapters', event.currentTarget)}
+          >
+            {timeDisplay}
+            {chapterIndex >= 0 && (
+              <span className="lmp-current-chapter">
+                {chapters[chapterIndex].label}
+              </span>
+            )}
+            <ChevronUp aria-hidden="true" />
+          </button>
+        ) : (
+          <div className="lmp-time">{timeDisplay}</div>
+        )}
+        <div className="lmp-spacer" />
+        <div className="lmp-options">
+          {selectedSubtitle && (
+            <button
+              className="lmp-button lmp-cc"
+              type="button"
+              aria-label="Subtitles"
+              title="Subtitles"
+              aria-pressed={captions}
+              onClick={() => playback.changeCaptions(!captions)}
+            >
+              <Captions aria-hidden="true" />
+            </button>
+          )}
+          {(!live || playback.selectedAudio || selectedSubtitle) && (
+            <button
+              className="lmp-button"
+              type="button"
+              aria-label="Settings"
+              title="Settings"
+              aria-expanded={settingsOpen}
+              aria-controls={panelId}
+              onClick={(event) => onPanel('settings', event.currentTarget)}
+            >
+              <Settings aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        {document.fullscreenEnabled && (
+          <button
+            className="lmp-button"
+            type="button"
+            aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            onClick={onFullscreen}
+          >
+            <FullscreenIcon aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}

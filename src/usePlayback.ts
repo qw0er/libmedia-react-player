@@ -90,6 +90,9 @@ function readMedia(player: Player, supportedCodecs: number[]) {
   }
 }
 
+export type MediaInfo = ReturnType<typeof readMedia>
+export type PlaybackState = ReturnType<typeof usePlayback>
+
 export function usePlayback(
   src: string,
   externalSubtitles: readonly ExternalSubtitleTrack[],
@@ -103,7 +106,7 @@ export function usePlayback(
     lastVolume: number
   } | null>(null)
   const [status, setStatus] = useState<Status>('loading')
-  const [media, setMedia] = useState<ReturnType<typeof readMedia>>()
+  const [media, setMedia] = useState<MediaInfo>()
   const [position, setPosition] = useState(0)
   const [pendingSeek, setPendingSeek] = useState<number>()
   const [busy, setBusy] = useState(false)
@@ -287,8 +290,8 @@ export function usePlayback(
     position: pendingSeek ?? position,
     busy,
     notice,
-    audioId,
-    subtitleId,
+    selectedAudio: media?.audio.find((track) => track.id === audioId),
+    selectedSubtitle: media?.subtitles.find((track) => track.id === subtitleId),
     captions,
     delay,
     volume,

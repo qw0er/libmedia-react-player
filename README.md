@@ -37,7 +37,7 @@ export default function App() {
 }
 ```
 
-The control layout follows the player's own width. On wide players, use the bottom control bar. On narrow players, tap the picture to show playback controls and open Settings at the upper right. Click or tap the time display when it has a chevron to open the chapter list.
+The control layout follows the player's own width. On wide players, use the bottom control bar. On narrow players, tap the picture to show playback controls and open Settings at the upper right. In the narrow layout and on touch-first devices, the buttons beside Play or Pause skip backward and forward five seconds. Click or tap the time display when it has a chevron to open the chapter list.
 
 Use **CC** to toggle the current subtitle track. Settings also lets you select audio and subtitle tracks, adjust subtitle timing, and set playback speed. To load supported external text subtitles, pass an array of distinct subtitle URLs.
 
