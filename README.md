@@ -2,7 +2,7 @@
 
 A React video player built on [libmedia AVPlayer](https://github.com/zhaohappy/libmedia), with a focus on Matroska (MKV) playback. It includes a responsive player interface, chapter navigation, audio and subtitle track selection, and a WebAssembly SIMD software decoding fallback.
 
-This package is in early development and is not yet published to npm. See the [v0.1 requirements](docs/requirements.md) for the planned scope.
+See the [v0.1 requirements](docs/requirements.md) for the planned scope.
 
 ## Requirements
 
@@ -14,14 +14,11 @@ The package includes the AVPlayer runtime and its WASM assets. Applications with
 
 ## Installation
 
-Build a tarball from this repository, then install it in your React application:
+Install the package from npm in your React application:
 
 ```sh
-npm pack
-npm install /path/to/libmedia-react-player-0.1.0-dev.0.tgz
+npm install libmedia-react-player
 ```
-
-Building the package requires Node.js 22.13 or later in the 22.x series, or Node.js 24 and above.
 
 ## Quick start
 
@@ -74,6 +71,7 @@ With libmedia 1.3.1, seeking into the final cue of an external SRT can leave tha
 | `onSeeked`              | `(event: LibmediaSeekEvent) => void`        | Reports the requested and settled positions.                                                                                    |
 | `onTrackChange`         | `(event: LibmediaTrackChangeEvent) => void` | Reports the active audio and subtitle tracks when playback first starts and when either selection changes.                      |
 | `onEnded`               | `(event: LibmediaPlaybackProgress) => void` | Reports the final position after natural playback completion.                                                                   |
+| `onNextEpisode`         | `() => void`                                | Shows a Next episode button beside Play and calls the host when activated. Omit this prop to hide the button.                   |
 | `onError`               | `(event: LibmediaPlayerError) => void`      | Reports the failed operation, a display-safe message, and whether the error is fatal.                                           |
 
 All event payloads include `src`. Progress events include `positionMs` and `durationMs`; duration is `null` when unknown or live. `onSeeked` also includes `requestedPositionMs`. Callbacks from an earlier session are invalidated when the source changes. The component exports these event types, `LibmediaPlayerProps`, `ExternalSubtitleTrack`, and `LibmediaPlayerHandle`.
@@ -162,6 +160,8 @@ export default defineConfig({
 Cross-origin resources must also be permitted by CORS or CORP as applicable. Check `window.crossOriginIsolated` in the browser to verify the page is isolated.
 
 ## Development
+
+Building the package requires Node.js 22.13 or later in the 22.x series, or Node.js 24 and above.
 
 ```sh
 npm ci

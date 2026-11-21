@@ -87,4 +87,6 @@ export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   externalSubtitles?: readonly ExternalSubtitleTrack[]
   /** Applied once when the source loads. Use seekTo to change position later. */
   initialPositionMs?: number
+  /** Shows the Next episode button and handles its activation. */
+  onNextEpisode?: () => void
 }

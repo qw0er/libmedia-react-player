@@ -74,6 +74,7 @@ function Playback({
   mediaRequest,
   externalSubtitles = [],
   initialPositionMs,
+  onNextEpisode,
   ref,
   teardown,
   ...events
@@ -307,6 +308,7 @@ function Playback({
             panelId={panelId}
             fullscreen={fullscreen}
             onPlay={play}
+            onNextEpisode={onNextEpisode}
             onScrub={setScrub}
             onFullscreen={toggleFullscreen}
             onPanel={handlePanel}

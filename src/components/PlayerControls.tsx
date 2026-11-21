@@ -4,6 +4,7 @@ import {
   Maximize,
   Minimize,
   Settings,
+  SkipForward,
   Volume2,
   VolumeX,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ interface ControlsProps {
   fullscreen: boolean
   onScrub: (time?: number) => void
   onPlay: () => void
+  onNextEpisode?: () => void
   onFullscreen: () => void
   onPanel: (page: 'chapters' | 'settings', trigger: HTMLButtonElement) => void
 }
@@ -38,6 +40,7 @@ export function PlayerControls({
   fullscreen,
   onScrub,
   onPlay,
+  onNextEpisode,
   onFullscreen,
   onPanel,
 }: ControlsProps) {
@@ -77,6 +80,18 @@ export function PlayerControls({
           disabled={busy || (status === 'playing' && live)}
           onClick={onPlay}
         />
+        {onNextEpisode && (
+          <button
+            className="lmp-button lmp-next-episode"
+            type="button"
+            aria-label="Next episode"
+            title="Next episode"
+            onClick={() => onNextEpisode()}
+          >
+            <SkipForward aria-hidden="true" />
+            <span>Next episode</span>
+          </button>
+        )}
         {media.audio.length > 0 && (
           <div className="lmp-volume">
             <button
