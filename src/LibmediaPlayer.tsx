@@ -28,12 +28,16 @@ export type {
 
 export function LibmediaPlayer({
   src,
+  sourceFormat,
   externalSubtitles = [],
   ...props
 }: LibmediaPlayerProps) {
   const teardown = useRef(Promise.resolve())
+  const format =
+    sourceFormat?.trim().replace(/^\./, '').toLowerCase() || undefined
   const key = JSON.stringify([
     src,
+    format,
     externalSubtitles.map(({ src, label, language }) => [src, label, language]),
   ])
   return (
@@ -41,6 +45,7 @@ export function LibmediaPlayer({
       key={key}
       {...props}
       src={src}
+      sourceFormat={format}
       externalSubtitles={externalSubtitles}
       teardown={teardown}
     />
@@ -49,6 +54,7 @@ export function LibmediaPlayer({
 
 function Playback({
   src,
+  sourceFormat,
   externalSubtitles = [],
   initialPositionMs,
   ref,
@@ -61,6 +67,7 @@ function Playback({
   const [initialPosition] = useState(initialPositionMs)
   const playback = usePlayback(
     src,
+    sourceFormat,
     subtitleSources,
     initialPosition,
     teardown,

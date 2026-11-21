@@ -117,6 +117,7 @@ function seekTarget(media: MediaInfo | undefined, positionMs: number) {
 
 export function usePlayback(
   src: string,
+  sourceFormat: string | undefined,
   externalSubtitles: readonly ExternalSubtitleTrack[],
   initialPositionMs: number | undefined,
   teardown: React.RefObject<Promise<void>>,
@@ -306,6 +307,7 @@ export function usePlayback(
           })
 
         await instance.load(new URL(src, document.baseURI).href, {
+          ext: sourceFormat,
           externalSubtitles: externalSubtitles.map(
             ({ src, label, language }) => ({
               source: new URL(src, document.baseURI).href,
@@ -355,7 +357,7 @@ export function usePlayback(
         .then(() => current?.player.destroy())
         .catch(() => {})
     }
-  }, [src, externalSubtitles, initialPositionMs, teardown])
+  }, [src, sourceFormat, externalSubtitles, initialPositionMs, teardown])
 
   const commands = useMemo(() => {
     function run<Result>(

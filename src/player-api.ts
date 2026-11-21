@@ -59,6 +59,8 @@ export interface LibmediaPlayerEvents {
 export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   ref?: Ref<LibmediaPlayerHandle>
   src: string
+  /** Media format as a file extension, such as `mkv`, for URLs without one. */
+  sourceFormat?: string
   externalSubtitles?: readonly ExternalSubtitleTrack[]
   /** Applied once when the source loads. Use seekTo to change position later. */
   initialPositionMs?: number

@@ -63,6 +63,7 @@ With libmedia 1.3.1, seeking into the final cue of an external SRT can leave tha
 | Prop                    | Type                                        | Description                                                                                                                     |
 | ----------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `src`                   | `string`                                    | Required media URL.                                                                                                             |
+| `sourceFormat`          | `string`                                    | Optional file extension to pass to AVPlayer. For example, use `sourceFormat="mkv"` with `src="/api/media/123"`.                 |
 | `externalSubtitles`     | `readonly ExternalSubtitleTrack[]`          | External subtitle tracks. Each has a required `src` and optional `label` and `language`.                                        |
 | `initialPositionMs`     | `number`                                    | Starting position in milliseconds, applied when the source loads.                                                               |
 | `ref`                   | `Ref<LibmediaPlayerHandle>`                 | Access to playback commands.                                                                                                    |
