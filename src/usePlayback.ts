@@ -509,17 +509,26 @@ export function usePlayback(
           if (!active || playback.status === 'error') return
           const { src, content, format, label, language } = track
           const count = instance.getStreams().length
-          await instance.loadExternalSubtitle({
-            source:
-              content === undefined
-                ? new URL(src, document.baseURI).href
-                : new File(
-                    [content],
-                    `subtitle-${index}.${track.renderer === 'styled' ? 'ass' : format.trim().replace(/^\./, '').toLowerCase()}`,
-                  ),
-            title: label,
-            lang: language,
-          })
+          try {
+            await instance.loadExternalSubtitle({
+              source:
+                content === undefined
+                  ? new URL(src, document.baseURI).href
+                  : new File(
+                      [content],
+                      `subtitle-${index}.${track.renderer === 'styled' ? 'ass' : format.trim().replace(/^\./, '').toLowerCase()}`,
+                    ),
+              title: label,
+              lang: language,
+            })
+          } catch {
+            playback.reportError(
+              'track',
+              `Could not load external subtitle track ${index + 1}.`,
+              false,
+            )
+            continue
+          }
           const stream = instance.getStreams()[count]
           if (stream?.mediaType === 'Subtitle') sidecars.set(stream.id, track)
         }
