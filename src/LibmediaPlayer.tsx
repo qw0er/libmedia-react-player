@@ -140,6 +140,7 @@ function Playback({
     captions,
     selectedSubtitle,
     styledSubtitle,
+    styledSubtitleStatus,
   } = playback
   const root = useRef<HTMLElement>(null)
   const panelTrigger = useRef<HTMLButtonElement | null>(null)
@@ -243,7 +244,7 @@ function Playback({
           setPanelOpen(false)
         }
       }}
-      data-captions={captions && !styledSubtitle}
+      data-captions={captions && styledSubtitleStatus !== 'styled'}
       data-status={status}
       onPointerDown={(event) => {
         pointerType.current = event.pointerType
@@ -291,16 +292,22 @@ function Playback({
         {styles}
       </style>
       <div className="lmp-viewport" ref={playback.viewport} />
-      {styledSubtitle && selectedSubtitle && media && (
-        <StyledSubtitles
-          key={selectedSubtitle.id}
-          track={styledSubtitle}
-          videoAspectRatio={media.videoAspectRatio}
-          visible={captions}
-          clock={playback.subtitleClock}
-          onError={playback.reportSubtitleError}
-        />
-      )}
+      {styledSubtitle &&
+        styledSubtitleStatus !== 'fallback' &&
+        selectedSubtitle &&
+        media &&
+        status !== 'error' && (
+          <StyledSubtitles
+            key={selectedSubtitle.id}
+            trackId={selectedSubtitle.id}
+            track={styledSubtitle}
+            videoAspectRatio={media.videoAspectRatio}
+            visible={captions}
+            rendered={styledSubtitleStatus === 'styled'}
+            clock={playback.subtitleClock}
+            onStatus={playback.setStyledSubtitleStatus}
+          />
+        )}
 
       {loaded && (playing || status === 'paused') && (
         <button

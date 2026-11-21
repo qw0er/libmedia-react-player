@@ -8,30 +8,26 @@ Anishelf acceptance checks.
 
 ## Playback blockers
 
-- [ ] **Cancel stalled work on source changes.** Chrome reproduced a pending
-      sidecar request holding up both readiness and the next source. Teardown also
-      waits for main-media loading, the initial seek, and any in-flight command,
-      so a stall in those operations can hold up the next source through the same
-      path. **Fix.** Give each session a cancellation scope. Keep optional sidecars
-      off the readiness path where possible, and bound any work that must finish
-      first. Make source replacement independent of the old work settling.
-      Invalidate stale callbacks immediately and release the old engine and Workers
-      safely even when an operation stalls. **Verify.** Keep a sidecar request and a
-      main-media request pending in separate tests, then switch to a playable
-      episode. Also switch during a stalled seek. The new episode reaches
-      `onReady`, and any late completion from the old source has no effect.
-      [Loading](../src/usePlayback.ts#L504) · [Teardown](../src/usePlayback.ts#L599)
+- [x] **Cancel stalled work on source changes.** Fixed in `3632dad` and
+      revalidated after switching to the fork in `5f0e2b4`. A replacement
+      session starts without waiting for the previous session to settle.
+      Switching sources aborts pending direct HTTP requests and suppresses
+      callbacks from the previous session. Remote sidecars share an
+      eight-second startup budget and report nonfatal errors on timeout.
+      **Verified in Chrome 157.** The next source played when a subtitle,
+      main-media request, or seek range request was stalled. Packaged
+      Anishelf Electron verification is pending.
+      [Loading](../src/usePlayback.ts#L508) · [Cancellation](../src/usePlayback.ts#L620)
 
-- [ ] **Restore captions when styled rendering fails.** Blocking the styled
-      renderer in Chrome produced a nonfatal error while the chosen track still
-      appeared active and its native captions stayed hidden. **Fix.** Keep native
-      output visible until the styled layer has rendered successfully. If styled
-      initialization or drawing fails, stop the failed renderer and restore native
-      output when available. Reflect the actual fallback in the UI and track
-      state. **Verify.** Exercise both an initialization failure and a failure
-      after drawing starts. Confirm visible native captions when available, a
-      single nonfatal notification, and working caption toggles and track changes.
-      [Caption visibility](../src/LibmediaPlayer.tsx#L252) · [Styled renderer lifecycle](../src/components/StyledSubtitles.tsx)
+- [x] **Restore captions when styled rendering fails.** Keep libmedia captions
+      visible until the first successful styled draw. On failure, stop JASSUB,
+      keep the same track selected with libmedia rendering, and report one
+      nonfatal error. The track stays on libmedia for the current playback
+      session. **Verified in Chrome.** Injected a Worker startup error, a draw
+      rejection after rendering began, and a draw that never replied. Confirmed
+      visible libmedia captions, a single notification, and working caption
+      toggles and track changes.
+      [Caption visibility](../src/LibmediaPlayer.tsx#L247) · [Styled renderer lifecycle](../src/components/StyledSubtitles.tsx)
 
 - [ ] **Verify same-origin runtime delivery in packaged Anishelf.** The former
       AVPlayer blob entry and audio worklet scripts failed under the Anishelf CSP.

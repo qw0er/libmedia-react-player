@@ -23,11 +23,14 @@ const sidecarTimeoutMs = 8000
 // The range input can round its rightmost position down by up to one step.
 const endSeekToleranceMs = 100
 
+type StyledSubtitleStatus = 'styled' | 'fallback'
+
 interface TrackSelection {
   selectedAudio?: MediaInfo['audio'][number]
   selectedSubtitle?: MediaInfo['subtitles'][number]
   captions: boolean
   styledSubtitle?: Extract<ExternalSubtitleTrack, { renderer: 'styled' }>
+  styledSubtitleStatus?: StyledSubtitleStatus
 }
 
 function metadataText(value: unknown) {
@@ -129,6 +132,7 @@ interface Session {
   progress: () => LibmediaPlaybackProgress
   updatePosition: (positionMs: number, publication?: 'sample' | 'force') => void
   syncTracks: (captions?: boolean) => void
+  setStyledSubtitleStatus: (id: number, status: StyledSubtitleStatus) => void
   emit: (notify: (events: LibmediaPlayerEvents) => void) => void
   reportError: (operation: Operation, message: string, fatal: boolean) => void
 }
@@ -250,6 +254,7 @@ export function usePlayback(
         let userSubtitleDelay = 0
         let subtitleOffset = 0
         const sidecars = new Map<number, ExternalSubtitleTrack>()
+        const failedStyledSubtitles = new Set<number>()
         const instance = new AVPlayer({
           ...runtimeOptions,
           container,
@@ -418,6 +423,13 @@ export function usePlayback(
               captions,
               styledSubtitle:
                 sidecar?.renderer === 'styled' ? sidecar : undefined,
+              styledSubtitleStatus:
+                previous?.selectedSubtitle === selectedSubtitle
+                  ? previous?.styledSubtitleStatus
+                  : selectedSubtitle &&
+                      failedStyledSubtitles.has(selectedSubtitle.id)
+                    ? 'fallback'
+                    : undefined,
             }
             setTracks(selection)
             const visibleSubtitle = captions ? selectedSubtitle : undefined
@@ -437,6 +449,27 @@ export function usePlayback(
               subtitle: visibleSubtitle ? { ...visibleSubtitle } : null,
             }
             emit((events) => events.onTrackChange?.(event))
+          },
+          setStyledSubtitleStatus(id, status) {
+            if (
+              !active ||
+              playback.status === 'error' ||
+              selection?.selectedSubtitle?.id !== id ||
+              !selection.styledSubtitle ||
+              selection.styledSubtitleStatus === 'fallback'
+            )
+              return
+
+            selection = { ...selection, styledSubtitleStatus: status }
+            setTracks(selection)
+            if (status === 'fallback') {
+              failedStyledSubtitles.add(id)
+              playback.reportError(
+                'track',
+                'Could not render styled subtitles. Using libmedia subtitles for this track.',
+                false,
+              )
+            }
           },
           emit,
           reportError(operation, message, fatal) {
@@ -764,12 +797,8 @@ export function usePlayback(
       controls,
       run,
       subtitleClock: () => session.current?.subtitleClock(),
-      reportSubtitleError: () =>
-        session.current?.reportError(
-          'track',
-          'Could not render the styled subtitle track.',
-          false,
-        ),
+      setStyledSubtitleStatus: (id: number, status: StyledSubtitleStatus) =>
+        session.current?.setStyledSubtitleStatus(id, status),
     }
   }, [])
 
@@ -826,7 +855,7 @@ export function usePlayback(
     notice,
     ...tracks,
     subtitleClock: commands.subtitleClock,
-    reportSubtitleError: commands.reportSubtitleError,
+    setStyledSubtitleStatus: commands.setStyledSubtitleStatus,
     delay,
     volume,
     rate,
