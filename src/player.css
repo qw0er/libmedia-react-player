@@ -374,6 +374,8 @@
   display: grid;
   align-items: center;
   height: 22px;
+  cursor: pointer;
+  touch-action: none;
 }
 
 .lmp-timeline input {
@@ -385,8 +387,7 @@
   margin: 0;
   border-radius: 5px;
   background: transparent;
-  cursor: pointer;
-  touch-action: none;
+  pointer-events: none;
 }
 
 .lmp-timeline input::-webkit-slider-thumb {

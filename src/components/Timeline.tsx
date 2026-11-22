@@ -1,4 +1,4 @@
-import { type CSSProperties, useRef, useState } from 'react'
+import { type CSSProperties, type PointerEvent, useRef, useState } from 'react'
 import type { BufferedRange } from '../useBuffering'
 import type { MediaInfo } from '../usePlayback'
 import { clock, seekStepMs, usePlayerLabels } from './player-ui'
@@ -23,7 +23,8 @@ export function Timeline({
   onSeek,
 }: TimelineProps) {
   const labels = usePlayerLabels()
-  const dragging = useRef(false)
+  const slider = useRef<HTMLInputElement>(null)
+  const activePointer = useRef<number | null>(null)
   const [hover, setHover] = useState<number>()
   const starts = [
     0,
@@ -42,6 +43,21 @@ export function Timeline({
       : chapters.findLast(
           (chapter) => chapter.start <= preview && chapter.start < duration,
         )
+
+  function pointerTime(event: PointerEvent<HTMLDivElement>) {
+    const { left, width } = event.currentTarget.getBoundingClientRect()
+    if (width === 0) return time
+    const fraction = Math.max(0, Math.min(1, (event.clientX - left) / width))
+    return fraction * duration
+  }
+
+  function finishScrub(event: PointerEvent<HTMLDivElement>) {
+    if (activePointer.current !== event.pointerId) return
+    activePointer.current = null
+    onScrub(undefined)
+    if (event.type === 'pointerup') onSeek(pointerTime(event))
+  }
+
   return (
     <div
       className="lmp-timeline"
@@ -50,6 +66,27 @@ export function Timeline({
           '--lmp-progress': `${(time / duration) * 100}%`,
         } as CSSProperties
       }
+      onPointerDown={(event) => {
+        if (event.button !== 0 || activePointer.current !== null) return
+        event.preventDefault()
+        if (event.pointerType === 'mouse') {
+          slider.current?.focus({ preventScroll: true })
+        } else setHover(undefined)
+        activePointer.current = event.pointerId
+        event.currentTarget.setPointerCapture(event.pointerId)
+        onScrub(pointerTime(event))
+      }}
+      onPointerMove={(event) => {
+        if (activePointer.current === event.pointerId) {
+          onScrub(pointerTime(event))
+        } else if (event.pointerType === 'mouse') {
+          setHover(pointerTime(event))
+        }
+      }}
+      onPointerLeave={() => setHover(undefined)}
+      onPointerUp={finishScrub}
+      onPointerCancel={finishScrub}
+      onLostPointerCapture={finishScrub}
     >
       {preview !== undefined && (
         <div
@@ -106,6 +143,7 @@ export function Timeline({
       </div>
       <span className="lmp-thumb" aria-hidden="true" />
       <input
+        ref={slider}
         aria-label={labels.seek}
         aria-valuetext={`${clock(time)} of ${clock(duration)}`}
         type="range"
@@ -113,40 +151,7 @@ export function Timeline({
         max={duration}
         step={100}
         value={time}
-        onPointerDown={(event) => {
-          if (event.button !== 0) return
-          if (event.pointerType !== 'mouse') setHover(undefined)
-          dragging.current = true
-          event.currentTarget.setPointerCapture(event.pointerId)
-          onScrub(Number(event.currentTarget.value))
-        }}
-        onChange={(event) => {
-          const value = Number(event.currentTarget.value)
-          if (dragging.current) onScrub(value)
-          else onSeek(value)
-        }}
-        onPointerMove={(event) => {
-          if (event.pointerType !== 'mouse') return
-          const rect = event.currentTarget.getBoundingClientRect()
-          setHover(
-            duration *
-              Math.max(
-                0,
-                Math.min(1, (event.clientX - rect.left) / rect.width),
-              ),
-          )
-        }}
-        onPointerLeave={() => setHover(undefined)}
-        onPointerUp={(event) => {
-          if (!dragging.current) return
-          dragging.current = false
-          onScrub(undefined)
-          onSeek(Number(event.currentTarget.value))
-        }}
-        onLostPointerCapture={() => {
-          dragging.current = false
-          onScrub(undefined)
-        }}
+        onChange={(event) => onSeek(Number(event.currentTarget.value))}
         onKeyDown={(event) => {
           const targets: Record<string, number> = {
             ArrowLeft: time - seekStepMs,
