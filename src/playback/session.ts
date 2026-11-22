@@ -1,5 +1,6 @@
 import type { BundledPlayer } from '../bundledPlayer'
 import type {
+  LibmediaErrorReason,
   LibmediaPlaybackProgress,
   LibmediaPlaybackState,
   LibmediaPlaybackStatus,
@@ -7,6 +8,7 @@ import type {
   LibmediaPlayerEvents,
 } from '../player-api'
 import { startPlayback } from './autoplay'
+import { describeFailure, type FailureDetail } from './failure'
 import {
   loadSource,
   type MediaInfo,
@@ -45,10 +47,13 @@ export interface PlaybackSession {
     publication?: PositionPublication,
   ) => void
   emit: EmitEvent
+  /** Rechecks the source to classify a failure, such as a rejected seek. */
+  classifyFailure: () => Promise<FailureDetail>
   reportError: (
     operation: LibmediaPlayerError['operation'],
     message: string,
     fatal: boolean,
+    detail?: { reason?: LibmediaErrorReason; httpStatus?: number },
   ) => void
 }
 
@@ -72,12 +77,14 @@ export function startPlaybackSession(
   callbacks: SessionCallbacks,
 ) {
   const { src, initialAudio, initialPositionMs } = source
+  const mediaUrl = new URL(src, document.baseURI).href
   const lifetime = new AbortController()
   const { signal } = lifetime
   let active = true
   let observer: ResizeObserver | undefined
   let current: PlaybackSession | undefined
   let lastReportedState: LibmediaPlaybackState | undefined
+  let reportedFailure = false
 
   function emit(notify: Parameters<EmitEvent>[0]) {
     // Host code can issue new commands without interrupting the engine's event dispatch.
@@ -99,10 +106,8 @@ export function startPlaybackSession(
     emit((events) => events.onPlaybackStateChange?.(state))
   }
 
-  function reportLoadError() {
-    if (!active) return
-    const message = 'Could not load the video.'
-    if (current) current.reportError('load', message, true)
+  function publishErrorState() {
+    if (current) current.setStatus('error')
     else {
       callbacks.setStatus('error')
       publishState({
@@ -112,10 +117,32 @@ export function startPlaybackSession(
         playbackRate: 1,
         seeking: false,
       })
-      emit((events) =>
-        events.onError?.({ src, operation: 'load', message, fatal: true }),
-      )
     }
+  }
+
+  async function reportFatalFailure(
+    operation: 'load' | 'playback',
+    message: string,
+  ) {
+    if (!active || reportedFailure) return
+    reportedFailure = true
+    // Shut down the engine's UI immediately; classification only enriches the
+    // public error, which Anishelf needs before it decides how to recover.
+    publishErrorState()
+    const detail = await describeFailure(mediaUrl, source.mediaRequest, signal)
+    if (!active || detail.reason === 'aborted') return
+    emit((events) =>
+      events.onError?.({
+        src,
+        operation,
+        message,
+        fatal: true,
+        reason: detail.reason,
+        ...(detail.httpStatus === undefined
+          ? {}
+          : { httpStatus: detail.httpStatus }),
+      }),
+    )
   }
 
   async function open() {
@@ -228,11 +255,24 @@ export function startPlaybackSession(
         emit((events) => events.onTimeUpdate?.(progress))
       },
       emit,
-      reportError(operation, message, fatal) {
+      classifyFailure: () =>
+        describeFailure(mediaUrl, source.mediaRequest, signal),
+      reportError(operation, message, fatal, detail) {
         if (!active || playback.status === 'error') return
         if (fatal) playback.setStatus('error')
         else callbacks.setNotice(message)
-        emit((events) => events.onError?.({ src, operation, message, fatal }))
+        emit((events) =>
+          events.onError?.({
+            src,
+            operation,
+            message,
+            fatal,
+            reason: detail?.reason ?? 'unknown',
+            ...(detail?.httpStatus === undefined
+              ? {}
+              : { httpStatus: detail.httpStatus }),
+          }),
+        )
       },
     }
     current = playback
@@ -250,8 +290,12 @@ export function startPlaybackSession(
 
     player
       .on('error', () => {
-        if (playback.status === 'loading') reportLoadError()
-        else playback.reportError('playback', 'Playback failed.', true)
+        void reportFatalFailure(
+          playback.status === 'loading' ? 'load' : 'playback',
+          playback.status === 'loading'
+            ? 'Could not load the video.'
+            : 'Playback failed.',
+        )
       })
       .on('played', () => {
         if (!active || playback.status === 'error') return
@@ -366,7 +410,10 @@ export function startPlaybackSession(
     playbackRate: 1,
     seeking: false,
   })
-  const loading = open().catch(reportLoadError)
+  const loading = open().catch(() => {
+    // Do not hold disposal for the diagnostic request.
+    void reportFatalFailure('load', 'Could not load the video.')
+  })
 
   return function dispose() {
     active = false

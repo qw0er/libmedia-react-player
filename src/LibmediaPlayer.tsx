@@ -27,6 +27,7 @@ export type {
   LibmediaAudioSelection,
   LibmediaAudioTrack,
   LibmediaControlLabels,
+  LibmediaErrorReason,
   LibmediaInitialPositionResult,
   LibmediaPlaybackProgress,
   LibmediaPlaybackState,
@@ -36,6 +37,7 @@ export type {
   LibmediaPlayerHandle,
   LibmediaPlayerProps,
   LibmediaRequestOptions,
+  LibmediaRetryOptions,
   LibmediaSeekEvent,
   LibmediaTrack,
   LibmediaTrackChangeEvent,
@@ -131,7 +133,10 @@ function Playback({
     events,
   )
   const { controls } = playback
-  useImperativeHandle(ref, () => controls, [controls])
+  useImperativeHandle(ref, () => ({ ...controls, retry: playback.retry }), [
+    controls,
+    playback.retry,
+  ])
   const {
     media,
     status,

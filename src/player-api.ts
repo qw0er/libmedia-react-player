@@ -80,11 +80,46 @@ export interface LibmediaTrackChangeEvent {
   subtitle: LibmediaTrack | null
 }
 
+/**
+ * Stable classification for a failed operation. Load, playback, and seek
+ * failures are classified with one diagnostic range request that reuses the
+ * source URL and `mediaRequest` settings.
+ */
+export type LibmediaErrorReason =
+  /** The session was replaced or cancelled. Ignore it. */
+  | 'aborted'
+  /** HTTP 401. Refresh credentials and retry. */
+  | 'credentials'
+  /** HTTP 403. The credentials worked but access was denied. */
+  | 'forbidden'
+  /** HTTP 404 or 410. The asset is not available. */
+  | 'not-found'
+  /** Another HTTP 4xx response. */
+  | 'unavailable'
+  /** HTTP 408, 425, 429, or 5xx. Retrying may succeed. */
+  | 'server'
+  /** The request produced no HTTP response, such as an offline or CORS failure. */
+  | 'network'
+  /** The source responded, but the engine could not load it. */
+  | 'engine'
+  /** The failure could not be classified. */
+  | 'unknown'
+
 export interface LibmediaPlayerError {
   src: string
   operation: 'load' | 'playback' | 'play' | 'pause' | 'seek' | 'track'
   message: string
+  reason: LibmediaErrorReason
+  /** HTTP status of the diagnostic request. Absent when no response arrived. */
+  httpStatus?: number
   fatal: boolean
+}
+
+export interface LibmediaRetryOptions {
+  /** Replacement URL for the same asset, such as one with a refreshed token. */
+  src?: string
+  /** Replacement request options. Omit to reuse the current settings. */
+  mediaRequest?: LibmediaRequestOptions
 }
 
 export interface LibmediaPlayerHandle {
@@ -93,6 +128,13 @@ export interface LibmediaPlayerHandle {
   /** Returns the settled position in milliseconds. Before playback, this is the prepared start position. */
   seekTo(positionMs: number): Promise<number>
   selectAudio(selection: LibmediaAudioSelection): Promise<void>
+  /**
+   * Restarts the current source at the current position, or at the supplied
+   * initial position before the first load. Pass refreshed credentials or a new
+   * URL after a `credentials` or `forbidden` failure. Wait for `onReady` or
+   * `onError` before issuing playback commands.
+   */
+  retry(options?: LibmediaRetryOptions): void
 }
 
 export interface LibmediaPlayerEvents {

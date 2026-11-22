@@ -69,19 +69,37 @@ Anishelf acceptance checks.
 
 ## Anishelf integration and release
 
-- [ ] **Classify failures and verify device authentication.** The standalone
-      test reported HTTP 401 as a fatal load error and recovered after the request
-      headers changed. The public event has the same generic load message for
-      unrelated failures. **Fix.** Expose a stable reason and any available HTTP
-      status so Anishelf can distinguish expired credentials, retryable network
-      errors, and unavailable files. Wire retry to the current asset and saved
-      position. In packaged Electron, check that media Worker requests satisfy
-      the main-process credential hook's `webContents` and `frame.origin` checks.
-      **Verify.** Exercise Web session cookies and Electron device credentials on
-      initial reads and distant HTTP 206 seeks. Expire credentials during load and
-      during a later range read, then recover. Also retry a transient failure with
-      unchanged credentials and check how a missing asset is reported.
-      [Error contract](../src/player-api.ts#L83) · [Authenticated media](../README.md#authenticated-media)
+- [x] **Classify failures and retry from the current position.** `onError` now
+      exposes a stable `reason` and, when a response arrived, `httpStatus`. The
+      player classifies a fatal load or playback failure, and a rejected seek,
+      with one diagnostic byte-range request that reuses the source URL and
+      `mediaRequest`. `retry()` on the player handle reloads the current source
+      at the current position, or at `initialPositionMs` before the first load;
+      it accepts a refreshed `mediaRequest` or a replacement `src` for URL
+      tokens. A failed load emits one classified error.
+      **Verified in Chrome 157.** Exercised a 401 on load, a 503 that cleared, a
+      missing asset, credential expiry during a seek range read and during a
+      playback buffer refill, and retry with a refreshed header and with a new
+      URL token. Retries restored the saved or last reported position and
+      playback resumed; the transient case recovered with unchanged
+      credentials. Packaged Anishelf Electron verification is pending.
+      [Error contract](../src/player-api.ts#L88) · [Classification](../src/playback/failure.ts) · [Retry](../src/usePlayback.ts#L129)
+
+- [x] **Verify device authentication in packaged Electron.** The engine issues
+      media requests from a Worker, so the concern was whether Anishelf's
+      credential hook could attach device credentials. A packaged ASAR consumer
+      with Electron 45.3.1, a sandboxed renderer, an `anishelf://desktop`
+      standard scheme, and a hook that mirrors Anishelf's `webContents` and
+      `frame.origin` checks was exercised with page, Blob Worker, and
+      same-origin module Worker requests to `/api/test`. All three reported the
+      window's `webContentsId` and `frame.origin === 'anishelf://desktop'`, and
+      the hook-attached `Authorization` header reached the server. Device
+      credentials therefore reach media Worker requests. Real Anishelf
+      acceptance with a device token and distant HTTP 206 seeks remains part of
+      the final release validation. **If the renderer can read the media while
+      the engine fails with `reason: 'engine'` and `httpStatus: 200`, treat the
+      Worker request as unauthenticated.**
+      [Authenticated media](../README.md#authenticated-media) · [Error reasons](../README.md#errors-and-recovery)
 
 - [ ] **Make the next-episode chooser work in fullscreen.** The standalone
       test confirmed the callback at 390 px. In the Anishelf integration, the

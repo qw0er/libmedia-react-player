@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { createPlaybackCommands } from './playback/commands'
 import { type PlaybackSession, startPlaybackSession } from './playback/session'
 import type { MediaInfo } from './playback/source'
@@ -9,11 +16,18 @@ import type {
   LibmediaPlaybackStatus,
   LibmediaPlayerEvents,
   LibmediaRequestOptions,
+  LibmediaRetryOptions,
 } from './player-api'
 import { useBuffering } from './useBuffering'
 
 export type { MediaInfo } from './playback/source'
 export type PlaybackState = ReturnType<typeof usePlayback>
+
+interface Restart {
+  src: string
+  request?: LibmediaRequestOptions
+  position: number
+}
 
 export function usePlayback(
   src: string,
@@ -28,6 +42,8 @@ export function usePlayback(
   const session = useRef<PlaybackSession | null>(null)
   const listeners = useRef(events)
   const stalled = useRef(false)
+  const latest = useRef({ position: 0, loaded: false })
+  const [restart, setRestart] = useState<Restart>()
   const [status, setStatus] = useState<LibmediaPlaybackStatus>('loading')
   const [media, setMedia] = useState<MediaInfo>()
   const [position, setPosition] = useState(0)
@@ -48,10 +64,21 @@ export function usePlayback(
     listeners.current = events
   }, [events])
 
+  useLayoutEffect(() => {
+    latest.current = {
+      position: pendingSeek ?? position,
+      loaded: media !== undefined,
+    }
+  })
+
   useEffect(() => {
     stalled.current = buffering
     session.current?.publishState()
   }, [buffering])
+
+  const activeSrc = restart?.src ?? src
+  const activeRequest = restart?.request ?? mediaRequest
+  const activePosition = restart ? restart.position : initialPositionMs
 
   // Invalidate listeners at the source change commit, before the next engine loads.
   useLayoutEffect(() => {
@@ -60,11 +87,11 @@ export function usePlayback(
     return startPlaybackSession(
       container,
       {
-        src,
+        src: activeSrc,
         sourceFormat,
-        mediaRequest,
+        mediaRequest: activeRequest,
         externalSubtitles,
-        initialPositionMs,
+        initialPositionMs: activePosition,
         initialAudio,
       },
       {
@@ -89,13 +116,34 @@ export function usePlayback(
       },
     )
   }, [
-    src,
+    activeSrc,
     sourceFormat,
-    mediaRequest,
+    activeRequest,
     externalSubtitles,
-    initialPositionMs,
+    activePosition,
     initialAudio,
+    restart,
   ])
+
+  const retry = useCallback(
+    (options?: LibmediaRetryOptions) => {
+      const start = latest.current.loaded
+        ? latest.current.position
+        : (initialPositionMs ?? 0)
+      setStatus('loading')
+      setMedia(undefined)
+      setNotice('')
+      setPendingSeek(undefined)
+      setBusy(false)
+      setPosition(start)
+      setRestart((previous) => ({
+        src: options?.src ?? previous?.src ?? src,
+        request: options?.mediaRequest ?? previous?.request,
+        position: start,
+      }))
+    },
+    [src, initialPositionMs],
+  )
 
   const commands = useMemo(
     () =>
@@ -111,6 +159,7 @@ export function usePlayback(
   return {
     viewport,
     controls,
+    retry,
     status,
     media,
     buffered,

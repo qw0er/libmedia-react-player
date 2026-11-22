@@ -77,7 +77,7 @@ Use `sourceFormat` when the URL has no file extension. The player applies `media
 
 - For cross-origin requests, configure CORS for the application origin and request headers. Expose `Accept-Ranges` and `Content-Range` for byte-range playback.
 - For cross-origin cookies, use `mediaRequest={{ credentials: 'include' }}` and configure credentialed CORS.
-- On a fatal `load` error from HTTP 401, refresh the credentials and pass the updated request. To retry with the same credentials, remount with a new React `key`.
+- On a fatal `load` or `playback` error, call `retry()` on the ref with refreshed credentials or a new URL. See [Errors and recovery](#errors-and-recovery). Remounting with a new `key` also works when the host passes its saved position again.
 
 ## API
 
@@ -116,22 +116,43 @@ screen and restores the host layout on exit.
 | `onSeeked`                | Requested and settled positions after a successful seek                                                                                                        |
 | `onTrackChange`           | Initial active tracks on playback start, then changes. Audio includes the file's `streamIndex`, which can be matched to FFprobe's `stream.index` for that file |
 | `onEnded`                 | Natural playback completion                                                                                                                                    |
-| `onError`                 | Failed operation, display-safe message, and whether the error is fatal                                                                                         |
+| `onError`                 | Failed operation, display-safe message, stable `reason`, HTTP status when one was observed, and whether the error is fatal                                     |
 
 - Time values are in milliseconds. Duration is `null` for live streams or unknown durations.
 - Events include `src` and come from the active playback session.
 - An audio or subtitle value of `null` in `onTrackChange` means that track type has no active output.
+
+### Errors and recovery
+
+The engine reports only that a load or read failed, without an HTTP status. After a fatal `load` or `playback` error, and after a rejected seek, the player therefore makes one diagnostic byte-range request for `src` with the same `mediaRequest` settings and reports the result as `reason` plus `httpStatus` when a response arrived. Other nonfatal errors, such as a missing external subtitle, use `reason: 'unknown'`.
+
+| `reason`      | Reported when                                           | Suggested action                                                                   |
+| ------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `aborted`     | The session was replaced or cancelled                   | Ignore                                                                             |
+| `credentials` | HTTP 401                                                | Refresh credentials, then `retry({ mediaRequest })`                                |
+| `forbidden`   | HTTP 403                                                | The account is signed in but cannot read this asset; do not retry until it changes |
+| `not-found`   | HTTP 404 or 410                                         | Treat the asset as unavailable                                                     |
+| `unavailable` | Another HTTP 4xx response                               | Report the status and stop retrying                                                |
+| `server`      | HTTP 408, 425, 429, or 5xx                              | Retry after a delay                                                                |
+| `network`     | No HTTP response, including offline, CORS, and timeouts | Retry when connectivity returns                                                    |
+| `engine`      | The request succeeded but the engine could not load it  | Check format support and, in packaged Electron, the media Worker's credentials     |
+| `unknown`     | Unclassified, or the diagnostic could not run           | Treat as a load failure                                                            |
+
+A successful diagnostic (`reason: 'engine'` with `httpStatus: 200`) means the page can read the media while the engine cannot. In packaged Electron this can indicate that the main-process credential hook did not authenticate the media Worker's request.
 
 ### Commands
 
 Call these methods on the player ref after `onReady`. Handle rejected promises and start playback from a user gesture when the browser requires one.
 When the browser blocks autoplay, `play()` rejects with `NotAllowedError` and leaves the play controls available at the prepared position.
 
-| Method                     | Result                                                                                                    |
-| -------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `play()` / `pause()`       | Start or pause playback                                                                                   |
-| `seekTo(positionMs)`       | Resolve to the settled position in milliseconds                                                           |
-| `selectAudio(streamIndex)` | Select a file stream index. Pass `null` for silence. Selecting a track again restores the viewer's volume |
+| Method                     | Result                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `play()` / `pause()`       | Start or pause playback                                                                                                        |
+| `seekTo(positionMs)`       | Resolve to the settled position in milliseconds                                                                                |
+| `selectAudio(streamIndex)` | Select a file stream index. Pass `null` for silence. Selecting a track again restores the viewer's volume                      |
+| `retry(options?)`          | Restart the current source at the current position. Pass `{ mediaRequest }` or `{ src }` to recover with refreshed credentials |
+
+`retry()` reports the outcome through `onReady` or `onError`, like the initial load. After a fatal `load` error it resumes at the supplied `initialPositionMs`; after a fatal `playback` error it resumes at the last reported position. It does not start playback, so request a user gesture before calling `play()` when the browser requires one.
 
 See [TypeScript definitions](src/player-api.ts) for full signatures.
 

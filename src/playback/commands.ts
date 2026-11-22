@@ -54,7 +54,11 @@ export function createPlaybackCommands(
           current.reportError(operation, autoplayBlockedMessage, false)
           throw error
         }
-        current.reportError(operation, message, fatal)
+        const detail =
+          operation === 'seek' ? await current.classifyFailure() : undefined
+        current.signal.throwIfAborted()
+        if (current.status === 'error') throw new Error(message)
+        current.reportError(operation, message, fatal, detail)
         throw new Error(message)
       } finally {
         if (current.active) {
@@ -75,7 +79,7 @@ export function createPlaybackCommands(
     })
   }
 
-  const controls: LibmediaPlayerHandle = {
+  const controls: Omit<LibmediaPlayerHandle, 'retry'> = {
     play() {
       return run(
         'play',
