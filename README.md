@@ -59,7 +59,7 @@ For external ASS/SSA, use `renderer: 'styled'` to load JASSUB when the viewer se
 ```
 
 - `offsetMs` adjusts one sidecar. Positive values delay its cues. The viewer's subtitle delay is added to that offset.
-- While embedded ASS resources load, the native renderer may miss a cue already active at the resume position. Seeking into the final cue of an external SRT can leave it blank.
+- While embedded ASS resources load, the native renderer may miss a cue already active at the resume position.
 - The tested Matroska PGS bitmap track was unavailable in the subtitle menu.
 
 ## Authenticated media

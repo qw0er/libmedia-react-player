@@ -49,15 +49,13 @@ Anishelf acceptance checks.
       cancelled the old read.
       [Subtitle inputs](../README.md#subtitles)
 
-- [ ] **Restore the final cue of an external SRT after seeking.** Chrome showed
-      a blank final cue after seeking into it while paused and then resuming.
-      **Fix.** Fix the native cue lookup after seek or use a text renderer that
-      resolves the cue already active at the seek target. Keep the limitation in
-      the release notes if Anishelf explicitly accepts it for the switch.
-      **Verify.** Seek into the middle of the final cue while paused, resume, and
-      confirm the cue appears and clears at the expected times. Include an
-      authenticated SRT with a nonzero offset and a WebVTT smoke case.
-      [Known subtitle limitations](../README.md#subtitles)
+- [x] **Restore the final cue of an external SRT after seeking.** The native
+      demuxer resumes at the first cue that has not expired in subtitle time.
+      It reads the final cue even when the file ends without a blank separator.
+      **Verified in Chrome.** An authenticated SRT showed and cleared the final
+      cue after paused seeks in both directions. Positive and negative offsets,
+      overlapping cues, and an in-cue WebVTT seek also passed.
+      [Subtitle inputs](../README.md#subtitles)
 
 - [ ] **Decide how to handle Matroska PGS.** The tested bitmap fixture produced
       no selectable subtitle output. **Fix.** Decide whether PGS is required for
