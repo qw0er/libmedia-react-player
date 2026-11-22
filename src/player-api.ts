@@ -7,6 +7,8 @@ interface ExternalSubtitleOptions {
   offsetMs?: number
 }
 
+export type BitmapSubtitleFormat = 'pgs' | 'vobsub' | 'dvb' | 'mks'
+
 export type ExternalSubtitleTrack = ExternalSubtitleOptions &
   (
     | { src: string; content?: never; format?: never; renderer?: 'native' }
@@ -19,6 +21,13 @@ export type ExternalSubtitleTrack = ExternalSubtitleOptions &
         fonts?: readonly Blob[]
         src?: never
       }
+    | ({
+        renderer: 'bitmap'
+      } & ({ src: string; content?: never } | { content: Blob; src?: never }) &
+        (
+          | { format: Exclude<BitmapSubtitleFormat, 'vobsub'>; index?: never }
+          | { format: 'vobsub'; index?: string | Blob }
+        ))
   )
 
 export interface LibmediaRequestOptions {
@@ -70,7 +79,7 @@ export interface LibmediaInitialPositionResult extends LibmediaSeekEvent {
 }
 
 export interface LibmediaTrack {
-  /** AVPlayer stream ID for the current playback session. */
+  /** Track ID for the current playback session. */
   id: number
   label: string
   language?: string

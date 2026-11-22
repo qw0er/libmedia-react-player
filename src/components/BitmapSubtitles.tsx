@@ -1,12 +1,12 @@
-import type { PgsParser } from 'libbitsub'
+import type { UnifiedSubtitleParser } from 'libbitsub'
 import { useEffect, useRef } from 'react'
-import type { PgsSubtitleSource } from '../playback/tracks'
+import type { BitmapSubtitleSource } from '../playback/tracks'
 
-export function PgsSubtitles({
+export function BitmapSubtitles({
   track,
   clock,
 }: {
-  track: PgsSubtitleSource
+  track: BitmapSubtitleSource
   clock: () => number | undefined
 }) {
   const overlay = useRef<HTMLCanvasElement>(null)
@@ -16,7 +16,7 @@ export function PgsSubtitles({
     const context = canvas?.getContext('2d')
     const lifetime = new AbortController()
     const { signal } = lifetime
-    let parser: PgsParser | undefined
+    let parser: UnifiedSubtitleParser | undefined
     let frame = 0
 
     function stop() {
@@ -35,23 +35,48 @@ export function PgsSubtitles({
 
     async function start() {
       if (!canvas || !context) throw new Error('Canvas 2D is unavailable.')
-      const [{ initWasm, PgsParser }, data] = await Promise.all([
+      const [{ initWasm, UnifiedSubtitleParser }, data] = await Promise.all([
         import('libbitsub'),
         track.load(signal),
       ])
       await initWasm()
       signal.throwIfAborted()
-      const decoded = new PgsParser()
+      const decoded = new UnifiedSubtitleParser()
       parser = decoded
-      if (!decoded.load(data)) throw new Error('No PGS display sets found.')
+      switch (data.format) {
+        case 'auto':
+          decoded.loadAuto({ data: data.bytes, fileName: 'subtitle.sub' })
+          break
+        case 'pgs':
+          decoded.loadPgs(data.bytes)
+          break
+        case 'dvb':
+          decoded.loadDvb(data.bytes)
+          break
+        case 'mks':
+          decoded.loadVobSubMks(data.bytes)
+          break
+        case 'vobsub':
+          if (data.index === undefined) decoded.loadVobSubOnly(data.bytes)
+          else decoded.loadVobSub(data.index, data.bytes)
+          break
+      }
+      if (!decoded.count) throw new Error('No bitmap subtitle cues found.')
 
+      const cueStarts = data.cueEnds && decoded.getTimestamps()
       let lastIndex = -1
       function draw() {
         if (!canvas || !context || signal.aborted) return
         try {
           const time = clock()
-          const index =
-            time === undefined ? -1 : decoded.findIndexAtTimestamp(time / 1000)
+          let index =
+            time === undefined || time < 0
+              ? -1
+              : decoded.findIndexAtTimestamp(time / 1000)
+          if (time !== undefined && index >= 0 && cueStarts) {
+            const end = data.cueEnds?.get(cueStarts[index])
+            if (end !== undefined && time >= end) index = -1
+          }
           if (index !== lastIndex) {
             const image =
               index < 0 ? undefined : decoded.renderFrameDataAtIndex(index)
@@ -82,7 +107,7 @@ export function PgsSubtitles({
   }, [track, clock])
 
   return (
-    <div className="lmp-pgs-subtitles" aria-hidden="true">
+    <div className="lmp-bitmap-subtitles" aria-hidden="true">
       <canvas ref={overlay} />
     </div>
   )

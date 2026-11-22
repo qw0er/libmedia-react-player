@@ -4,8 +4,10 @@ import type {
   LibmediaAudioSelection,
   LibmediaRequestOptions,
 } from '../player-api'
+import { bitmapSidecarFormat } from './bitmap-subtitles'
 
 type Stream = ReturnType<BundledPlayer['getStreams']>[number]
+type TrackStream = Pick<Stream, 'id' | 'index' | 'metadata'>
 
 const sidecarTimeoutMs = 8000
 
@@ -32,12 +34,20 @@ export async function loadSource(
   })
 
   const sidecars = new Map<number, ExternalSubtitleTrack>()
+  const bitmapSidecars: Omit<TrackStream, 'index'>[] = []
   let sidecarDeadline: AbortSignal | undefined
   for (const [index, track] of source.externalSubtitles.entries()) {
     if (!canLoadSidecars()) break
     const { src, content, format, label, language } = track
     const count = player.getStreams().length
     try {
+      if (bitmapSidecarFormat(track)) {
+        // Libmedia uses -1 for no selection. Bitmap sidecars have no demux stream.
+        const id = -2 - index
+        sidecars.set(id, track)
+        bitmapSidecars.push({ id, metadata: { title: label, language } })
+        continue
+      }
       if (content === undefined) {
         sidecarDeadline ??= AbortSignal.timeout(sidecarTimeoutMs)
       }
@@ -63,14 +73,14 @@ export async function loadSource(
     const stream = player.getStreams()[count]
     if (stream?.mediaType === 'Subtitle') sidecars.set(stream.id, track)
   }
-  return sidecars
+  return { sidecars, bitmapSidecars }
 }
 
 function metadataText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function readTracks(streams: Stream[], fallback: string) {
+function readTracks(streams: TrackStream[], fallback: string) {
   const tracks = streams.map(({ id, index: streamIndex, metadata }, index) => ({
     id,
     streamIndex,
@@ -100,8 +110,14 @@ function readTracks(streams: Stream[], fallback: string) {
   })
 }
 
-export function readMedia(player: BundledPlayer, supportedCodecs: number[]) {
+export function readMedia(
+  player: BundledPlayer,
+  supportedCodecs: number[],
+  bitmapSidecars: Omit<TrackStream, 'index'>[],
+) {
   const streams = player.getStreams()
+  const nextStreamIndex =
+    streams.reduce((max, stream) => Math.max(max, stream.index), -1) + 1
   const video = streams.find(
     (stream) => stream.mediaType === 'Video',
   )?.codecparProxy
@@ -130,12 +146,18 @@ export function readMedia(player: BundledPlayer, supportedCodecs: number[]) {
       'Audio',
     ),
     subtitles: readTracks(
-      streams.filter(
-        (stream) =>
-          stream.mediaType === 'Subtitle' &&
-          (supportedCodecs.includes(stream.codecparProxy.codecId) ||
-            player.canLoadEmbeddedPgs(stream.id)),
-      ),
+      [
+        ...streams.filter(
+          (stream) =>
+            stream.mediaType === 'Subtitle' &&
+            (supportedCodecs.includes(stream.codecparProxy.codecId) ||
+              player.embeddedBitmapSubtitleFormat(stream.id)),
+        ),
+        ...bitmapSidecars.map((stream, index) => ({
+          ...stream,
+          index: nextStreamIndex + index,
+        })),
+      ],
       'Subtitle',
     ),
   }

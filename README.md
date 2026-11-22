@@ -41,7 +41,27 @@ These examples cover containers recognized by the bundled engine and decoders sh
 
 Selecting an embedded ASS/SSA track in an MKV loads its script and attached fonts automatically. Native captions remain available until JASSUB draws its first frame. The first selection of each track scans the MKV through a separate reader using the same `mediaRequest` settings. The script and fonts are cached for that playback session.
 
-Embedded PGS tracks in an MKV are selectable in **Settings → Subtitles**. The player reads the track when selected and caches its subtitle data for the playback session. libbitsub draws the bitmaps over the video, using the player's clock and subtitle delay.
+Embedded PGS, VobSub, and DVB-SUB tracks in an MKV are selectable in **Settings → Subtitles**. The player reads the selected track through a separate libmedia demuxer using the same `mediaRequest` settings. libbitsub decodes and draws the bitmaps using the player's clock and subtitle delay. The subtitle data is cached for the playback session.
+
+External bitmap tracks also load on selection. A URL ending in `.sup` loads PGS, `.idx` loads that index and its matching `.sub`, `.mks` loads an embedded VobSub track, and `.dvb` loads DVB-SUB as timestamped MPEG PES or a libbitsub DVB dump. libbitsub detects the format of a standalone `.sub` from its contents.
+
+For an extensionless URL or pre-fetched data, set `renderer: 'bitmap'` and use `format: 'pgs'`, `'vobsub'`, `'mks'`, or `'dvb'`. For a VobSub pair, pass the SUB file as `src` or `content` and the IDX file as `index` (a URL or Blob).
+
+```tsx
+;<LibmediaPlayer
+  src="/media/sample.mkv"
+  externalSubtitles={[
+    { src: '/media/sample.sup', label: 'English (PGS)' },
+    {
+      renderer: 'bitmap',
+      format: 'vobsub',
+      content: subBlob,
+      index: idxBlob,
+      label: 'English (VobSub)',
+    },
+  ]}
+/>
+```
 
 For external ASS/SSA, use `renderer: 'styled'` to load JASSUB when the viewer selects the track.
 

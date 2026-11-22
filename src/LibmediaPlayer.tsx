@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { PgsSubtitles } from './components/PgsSubtitles'
+import { BitmapSubtitles } from './components/BitmapSubtitles'
 import { CenterControls } from './components/PlaybackButtons'
 import { PlayerControls } from './components/PlayerControls'
 import { PlayerPanel } from './components/PlayerPanel'
@@ -23,6 +23,7 @@ import type { LibmediaPlayerProps } from './player-api'
 import { usePlayback } from './usePlayback'
 
 export type {
+  BitmapSubtitleFormat,
   ExternalSubtitleTrack,
   LibmediaAudioSelection,
   LibmediaAudioTrack,
@@ -69,6 +70,9 @@ export function LibmediaPlayer({
       track.offsetMs,
       track.renderer,
       track.renderer === 'styled' ? track.fonts?.length : undefined,
+      track.renderer === 'bitmap' && typeof track.index === 'string'
+        ? track.index
+        : undefined,
     ]),
     mediaRequest?.credentials,
     headers,
@@ -76,6 +80,9 @@ export function LibmediaPlayer({
   // Use a revision as the React key so URLs and credentials stay out of it.
   const contents = externalSubtitles.flatMap((track) => [
     track.content,
+    track.renderer === 'bitmap' && typeof track.index !== 'string'
+      ? track.index
+      : undefined,
     ...(track.renderer === 'styled' ? (track.fonts ?? []) : []),
   ])
   const [source, setSource] = useState({ signature, contents, revision: 0 })
@@ -154,7 +161,7 @@ function Playback({
     selectedSubtitle,
     styledSubtitle,
     styledSubtitleStatus,
-    pgsSubtitle,
+    bitmapSubtitle,
   } = playback
   const root = useRef<HTMLElement>(null)
   const panelTrigger = useRef<HTMLButtonElement | null>(null)
@@ -284,7 +291,7 @@ function Playback({
         }
       }}
       data-captions={
-        captions && !pgsSubtitle && styledSubtitleStatus !== 'styled'
+        captions && !bitmapSubtitle && styledSubtitleStatus !== 'styled'
       }
       data-status={status}
       onPointerDown={(event) => {
@@ -333,10 +340,10 @@ function Playback({
         {styles}
       </style>
       <div className="lmp-viewport" ref={playback.viewport} />
-      {pgsSubtitle && captions && selectedSubtitle && status !== 'error' && (
-        <PgsSubtitles
+      {bitmapSubtitle && captions && selectedSubtitle && status !== 'error' && (
+        <BitmapSubtitles
           key={selectedSubtitle.id}
-          track={pgsSubtitle}
+          track={bitmapSubtitle}
           clock={playback.subtitleClock}
         />
       )}

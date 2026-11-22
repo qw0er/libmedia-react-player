@@ -180,6 +180,11 @@ export function startPlaybackSession(
           http: source.mediaRequest,
           signal: AbortSignal.any([signal, trackSignal]),
         }),
+      loadEmbeddedBitmapSubtitle: (id, trackSignal) =>
+        player.loadEmbeddedBitmapSubtitle(id, {
+          http: source.mediaRequest,
+          signal: AbortSignal.any([signal, trackSignal]),
+        }),
       setTracks: callbacks.setTracks,
       setVolume: callbacks.setVolume,
       setDelay: callbacks.setDelay,
@@ -239,7 +244,9 @@ export function startPlaybackSession(
               undefined,
               runtimeOptions.audioWorkletUrls,
             ),
-          load,
+          async () => {
+            await load()
+          },
         ),
       progress() {
         const duration = playback.media?.duration ?? 0
@@ -292,7 +299,7 @@ export function startPlaybackSession(
     current = playback
 
     async function load() {
-      const sidecars = await loadSource(
+      const { sidecars, bitmapSidecars } = await loadSource(
         player,
         source,
         signal,
@@ -300,6 +307,7 @@ export function startPlaybackSession(
         (message) => playback.reportError('track', message, false),
       )
       tracks.setSidecars(sidecars)
+      return bitmapSidecars
     }
 
     player
@@ -354,9 +362,9 @@ export function startPlaybackSession(
       })
       .on('changed', () => tracks.syncTracks())
 
-    await load()
+    const bitmapSidecars = await load()
     if (!active || playback.status === 'error') return
-    const media = readMedia(player, AVPlayerSupportedCodecs)
+    const media = readMedia(player, AVPlayerSupportedCodecs, bitmapSidecars)
     playback.media = media
     if (initialAudio !== undefined) {
       try {
