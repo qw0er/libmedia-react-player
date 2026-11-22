@@ -1,6 +1,6 @@
 {
   "name": "libmedia-react-player",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A React player for Matroska built on libmedia AVPlayer, with chapter navigation and audio and subtitle track selection.",
   "license": "LGPL-3.0-or-later",
   "keywords": [
