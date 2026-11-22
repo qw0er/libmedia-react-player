@@ -37,9 +37,11 @@ These examples cover containers recognized by the bundled engine and decoders sh
 | Embedded text subtitles                | Automatically listed when supported by AVPlayer                  |
 | External subtitle URL                  | `{ src: '/media/sample.en.srt', label: 'English' }`              |
 | Authenticated or extensionless sidecar | Fetch it in your app and pass `{ content: blob, format: 'srt' }` |
-| Styled ASS/SSA with custom fonts       | Pass a complete script and font Blobs as shown below             |
+| External styled ASS/SSA                | Pass a complete script and font Blobs as shown below             |
 
-JASSUB loads when the viewer selects a track with `renderer: 'styled'`. Use this option for ASS/SSA tracks that need custom fonts, including fonts extracted from MKV attachments, or need to display cues that are already active at the seek target.
+Selecting an embedded ASS/SSA track in an MKV loads its script and attached fonts automatically. Native captions remain available until JASSUB draws its first frame. The first selection of each track scans the MKV through a separate reader using the same `mediaRequest` settings. The script and fonts are cached for that playback session.
+
+For external ASS/SSA, use `renderer: 'styled'` to load JASSUB when the viewer selects the track.
 
 ```tsx
 ;<LibmediaPlayer
@@ -57,7 +59,7 @@ JASSUB loads when the viewer selects a track with `renderer: 'styled'`. Use this
 ```
 
 - `offsetMs` adjusts one sidecar. Positive values delay its cues. The viewer's subtitle delay is added to that offset.
-- AVPlayer's default renderer may miss an embedded ASS cue already active at the resume position. Seeking into the final cue of an external SRT can also leave it blank.
+- While embedded ASS resources load, the native renderer may miss a cue already active at the resume position. Seeking into the final cue of an external SRT can leave it blank.
 - The tested Matroska PGS bitmap track was unavailable in the subtitle menu.
 
 ## Authenticated media

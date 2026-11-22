@@ -1,8 +1,21 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import type { ExternalSubtitleTrack } from '../player-api'
+import type { StyledSubtitleSource } from '../playback/tracks'
 import type { createStyledRenderer } from '../styledRenderer'
 
 const renderTimeoutMs = 8000
+
+async function loadResources(track: StyledSubtitleSource, signal: AbortSignal) {
+  if ('load' in track) return track.load(signal)
+  const [script, fonts] = await Promise.all([
+    track.content.text(),
+    Promise.all(
+      (track.fonts ?? []).map(
+        async (font) => new Uint8Array(await font.arrayBuffer()),
+      ),
+    ),
+  ])
+  return { script, fonts }
+}
 
 export function StyledSubtitles({
   trackId,
@@ -14,7 +27,7 @@ export function StyledSubtitles({
   onStatus,
 }: {
   trackId: number
-  track: Extract<ExternalSubtitleTrack, { renderer: 'styled' }>
+  track: StyledSubtitleSource
   videoAspectRatio?: number
   visible: boolean
   rendered: boolean
@@ -30,6 +43,7 @@ export function StyledSubtitles({
   useEffect(() => {
     const layer = container.current
     if (!layer) return
+    const resources = new AbortController()
     let active = true
     let frame = 0
     let timeout = 0
@@ -39,6 +53,7 @@ export function StyledSubtitles({
 
     function stop() {
       active = false
+      resources.abort()
       window.clearTimeout(timeout)
       cancelAnimationFrame(frame)
       observer?.disconnect()
@@ -54,16 +69,12 @@ export function StyledSubtitles({
     }
 
     async function start() {
-      const [{ createStyledRenderer }, script, fonts] = await Promise.all([
+      const [{ createStyledRenderer }, { script, fonts }] = await Promise.all([
         import('../styledRenderer'),
-        track.content.text(),
-        Promise.all(
-          (track.fonts ?? []).map(
-            async (font) => new Uint8Array(await font.arrayBuffer()),
-          ),
-        ),
+        loadResources(track, resources.signal),
       ])
       if (!active || !layer) return
+      if ('load' in track) timeout = window.setTimeout(fail, renderTimeoutMs)
       layer.append(canvas)
       const created = createStyledRenderer(canvas, script, fonts, fail)
       styled = created
@@ -109,7 +120,7 @@ export function StyledSubtitles({
       frame = requestAnimationFrame(renderFrame)
     }
 
-    timeout = window.setTimeout(fail, renderTimeoutMs)
+    if (!('load' in track)) timeout = window.setTimeout(fail, renderTimeoutMs)
     void start().catch(fail)
     return stop
   }, [trackId, track, videoAspectRatio, clock, onStatus])

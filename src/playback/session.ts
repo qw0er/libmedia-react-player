@@ -132,6 +132,11 @@ export function startPlaybackSession(
     let lastProgressAt = -Infinity
 
     const tracks = createPlaybackTracks(src, () => playback, {
+      loadEmbeddedAss: (id, trackSignal) =>
+        player.loadEmbeddedAss(id, {
+          http: source.mediaRequest,
+          signal: AbortSignal.any([signal, trackSignal]),
+        }),
       setTracks: callbacks.setTracks,
       setVolume: callbacks.setVolume,
       setDelay: callbacks.setDelay,

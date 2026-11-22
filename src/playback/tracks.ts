@@ -10,11 +10,20 @@ import type { MediaInfo } from './source'
 
 export type StyledSubtitleStatus = 'styled' | 'fallback'
 
+interface StyledSubtitleResources {
+  script: string
+  fonts: Uint8Array[]
+}
+
+export type StyledSubtitleSource =
+  | Extract<ExternalSubtitleTrack, { renderer: 'styled' }>
+  | { load: (signal: AbortSignal) => Promise<StyledSubtitleResources> }
+
 export interface TrackSelection {
   selectedAudio?: MediaInfo['audio'][number]
   selectedSubtitle?: MediaInfo['subtitles'][number]
   captions: boolean
-  styledSubtitle?: Extract<ExternalSubtitleTrack, { renderer: 'styled' }>
+  styledSubtitle?: StyledSubtitleSource
   styledSubtitleStatus?: StyledSubtitleStatus
 }
 
@@ -28,6 +37,10 @@ interface TrackPlayback {
 }
 
 interface TrackCallbacks {
+  loadEmbeddedAss: (
+    id: number,
+    signal: AbortSignal,
+  ) => Promise<StyledSubtitleResources | undefined>
   setTracks: (selection: TrackSelection) => void
   setVolume: (volume: number) => void
   setDelay: (delay: number) => void
@@ -51,6 +64,7 @@ export function createPlaybackTracks(
   let subtitleOffset = 0
   let selection: TrackSelection | undefined
   let sidecars = new Map<number, ExternalSubtitleTrack>()
+  const embeddedAss = new Map<number, StyledSubtitleResources>()
   const failedStyledSubtitles = new Set<number>()
 
   function setVolume(level: number) {
@@ -113,6 +127,27 @@ export function createPlaybackTracks(
     return currentPosition - userSubtitleDelay - subtitleOffset
   }
 
+  function styledSource(
+    id: number,
+    sidecar: ExternalSubtitleTrack | undefined,
+  ) {
+    if (sidecar) return sidecar.renderer === 'styled' ? sidecar : undefined
+    if (!getPlayback().player.canLoadEmbeddedAss(id)) return
+
+    return {
+      async load(signal: AbortSignal) {
+        const cached = embeddedAss.get(id)
+        if (cached) return cached
+        const resources = await callbacks.loadEmbeddedAss(id, signal)
+        signal.throwIfAborted()
+        if (!resources)
+          throw new Error('Could not read the embedded ASS track.')
+        embeddedAss.set(id, resources)
+        return resources
+      },
+    }
+  }
+
   function syncTracks(captions = selection?.captions ?? true) {
     const playback = getPlayback()
     if (
@@ -150,7 +185,10 @@ export function createPlaybackTracks(
       selectedAudio,
       selectedSubtitle,
       captions,
-      styledSubtitle: sidecar?.renderer === 'styled' ? sidecar : undefined,
+      styledSubtitle:
+        previous?.selectedSubtitle === selectedSubtitle
+          ? previous?.styledSubtitle
+          : selectedSubtitle && styledSource(selectedSubtitle.id, sidecar),
       styledSubtitleStatus:
         previous?.selectedSubtitle === selectedSubtitle
           ? previous?.styledSubtitleStatus

@@ -40,20 +40,14 @@ Anishelf acceptance checks.
 
 ## Subtitle compatibility
 
-- [ ] **Load embedded ASS and MKV fonts on demand.** JASSUB rendered the tested
-      positioned text, drawing, karaoke, and supplied font. Adding the script and
-      fonts after playback began rebuilt the session and reset the position.
-      **Fix.** Allow Anishelf to supply a script and attachment fonts for the
-      selected embedded track without changing the media session. Carry the
-      file-stream identity needed to request the correct track, scope the request
-      to the selected asset and track, and discard late results after a switch.
-      Keep native captions available while resources load. If Anishelf chooses
-      prefetching instead, bound the work and verify startup with unavailable
-      resources. **Verify.** Select an embedded ASS track mid-playback and seek into
-      an active cue. Check CJK attachment fonts, positioning, drawings, karaoke,
-      caption toggling, and timing on original and prepared copies. Confirm that
-      playback position, play state, and selected audio survive subtitle loading.
-      [Source revision key](../src/LibmediaPlayer.tsx#L57) · [Subtitle inputs](../README.md#subtitles)
+- [x] **Load embedded ASS and MKV fonts on demand.** The fork reads the selected
+      track with an independent demux cursor. The player keeps native captions
+      available during the scan and caches the result for the current session.
+      **Verified in Chrome.** An authenticated MKV with two ASS tracks and an
+      embedded CJK font kept its position, play state, and selected audio. A seek
+      into an active cue retained the styled output. Switching tracks or media
+      cancelled the old read.
+      [Subtitle inputs](../README.md#subtitles)
 
 - [ ] **Restore the final cue of an external SRT after seeking.** Chrome showed
       a blank final cue after seeking into it while paused and then resuming.
