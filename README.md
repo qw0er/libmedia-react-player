@@ -122,6 +122,7 @@ screen and restores the host layout on exit.
 ### Commands
 
 Call these methods on the player ref after `onReady`. Handle rejected promises and start playback from a user gesture when the browser requires one.
+When the browser blocks autoplay, `play()` rejects with `NotAllowedError` and leaves the play controls available at the prepared position.
 
 | Method                     | Result                                                                                                    |
 | -------------------------- | --------------------------------------------------------------------------------------------------------- |

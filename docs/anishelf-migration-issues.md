@@ -17,7 +17,7 @@ Anishelf acceptance checks.
       **Verified in Chrome 157.** The next source played when a subtitle,
       main-media request, or seek range request was stalled. Packaged
       Anishelf Electron verification is pending.
-      [Loading](../src/usePlayback.ts#L508) · [Cancellation](../src/usePlayback.ts#L620)
+      [Loading](../src/playback/source.ts#L21) · [Cancellation](../src/playback/session.ts#L361)
 
 - [x] **Restore captions when styled rendering fails.** Keep libmedia captions
       visible until the first successful styled draw. On failure, stop JASSUB,
@@ -29,29 +29,14 @@ Anishelf acceptance checks.
       toggles and track changes.
       [Caption visibility](../src/LibmediaPlayer.tsx#L247) · [Styled renderer lifecycle](../src/components/StyledSubtitles.tsx)
 
-- [ ] **Verify same-origin runtime delivery in packaged Anishelf.** The former
-      AVPlayer blob entry and audio worklet scripts failed under the Anishelf CSP.
-      The fork now emits AVPlayer and the two AudioWorklet modules as same-origin
-      files. The styled renderer also loads the JASSUB JS modules as same-origin
-      files. The Vite consumer build includes these assets under flat `assets/`
-      filenames. **Verify.** Install a production Anishelf package and test
-      authenticated HEVC playback and seeks, plus native and styled subtitles,
-      through `anishelf://desktop`. A production Vite consumer in Chrome passed
-      authenticated HEVC playback, seeking, and styled subtitle rendering under
-      the equivalent policy. The subtitle checks covered both JASSUB builds and
-      the modern build's pthread workers.
-      [Runtime loader](../src/bundledPlayer.ts) · [Deployment requirements](../README.md#runtime-and-deployment)
-
-- [ ] **Keep manual playback available after blocked autoplay.** The current
-      player treats a rejected `play()` as fatal and hides the play controls.
-      Browser autoplay denial reaching that path is a code-review risk.
-      **Fix.** Handle autoplay denial as recoverable and return to a state where a
-      user gesture can start playback. Have Anishelf surface its manual-play
-      prompt for that case and preserve the restored position. Keep genuine engine
-      failures actionable through the error path. **Verify.** Block autoplay from
-      a fresh profile, open the next episode via continuation, and start it
-      manually in the same session.
-      [Play command](../src/usePlayback.ts#L664)
+- [x] **Keep manual playback available after blocked autoplay.** Restore the play
+      controls and preserve the prepared position when the browser rejects
+      automatic playback. `play()` rejects with `NotAllowedError` and reports a
+      nonfatal error. **Verified in Chrome.** A fresh profile with autoplay
+      blocked played from the restored position after a click. Injected media
+      element rejections also recovered after MSE initialization. Allowed
+      autoplay still started and other engine errors remained fatal.
+      [Play command](../src/playback/commands.ts#L79)
 
 ## Subtitle compatibility
 
