@@ -164,6 +164,7 @@ function Playback({
     bitmapSubtitle,
   } = playback
   const root = useRef<HTMLElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
   const panelTrigger = useRef<HTMLButtonElement | null>(null)
   const panelId = useId()
   const pointerType = useRef('')
@@ -171,7 +172,8 @@ function Playback({
   const [idle, setIdle] = useState(false)
   const [page, setPage] = useState<PanelPage>('settings')
   const [panelOpen, setPanelOpen] = useState(false)
-  const [fullscreen, setFullscreen] = useState(false)
+  const [nativeFullscreen, setNativeFullscreen] = useState(false)
+  const [pageFullscreen, setPageFullscreen] = useState(false)
   const [fullscreenError, setFullscreenError] = useState('')
   const [scrub, setScrub] = useState<number>()
 
@@ -182,18 +184,37 @@ function Playback({
     (chapter) => chapter.start <= time,
   )
   const playing = status === 'playing'
-  const loaded = media && status !== 'error' && status !== 'starting'
+  const loaded = media && status !== 'error'
+  if (status === 'error' && pageFullscreen) setPageFullscreen(false)
   const visible = !playing || !idle || panelOpen || scrub !== undefined
   const buffering = playback.buffering && scrub === undefined
 
   useEffect(() => {
     function updateFullscreen() {
-      setFullscreen(document.fullscreenElement === root.current)
+      setNativeFullscreen(document.fullscreenElement === root.current)
     }
     document.addEventListener('fullscreenchange', updateFullscreen)
     return () =>
       document.removeEventListener('fullscreenchange', updateFullscreen)
   }, [])
+
+  useLayoutEffect(() => {
+    const layer = stage.current
+    if (!pageFullscreen || !layer) return
+
+    // Promote the playback layer while the outer player keeps its space in the page.
+    if (typeof layer.showPopover === 'function') {
+      layer.setAttribute('popover', 'manual')
+      layer.showPopover()
+    }
+    if (
+      pointerType.current !== 'touch' &&
+      !layer.contains(layer.ownerDocument.activeElement)
+    ) {
+      layer.focus({ preventScroll: true })
+    }
+    return () => layer.removeAttribute('popover')
+  }, [pageFullscreen])
 
   useLayoutEffect(() => {
     if (!panelOpen && panelTrigger.current) {
@@ -230,9 +251,22 @@ function Playback({
 
   async function toggleFullscreen() {
     setFullscreenError('')
+    if (pageFullscreen) {
+      setPageFullscreen(false)
+      return
+    }
+
+    const player = root.current
+    if (!player) return
     try {
-      if (fullscreen) await document.exitFullscreen()
-      else await root.current?.requestFullscreen()
+      if (player.ownerDocument.fullscreenElement === player)
+        await player.ownerDocument.exitFullscreen()
+      else if (
+        player.ownerDocument.fullscreenEnabled &&
+        typeof player.requestFullscreen === 'function'
+      )
+        await player.requestFullscreen()
+      else setPageFullscreen(true)
     } catch {
       setFullscreenError('Could not enter or exit fullscreen.')
     }
@@ -244,8 +278,8 @@ function Playback({
     if (!onNextEpisode || nextEpisodePending.current) return
     nextEpisodePending.current = true
     setFullscreenError('')
-    // Exit synchronously so the host chooser is outside fullscreen by the time
-    // it opens, then pause before reporting the activation.
+    setPageFullscreen(false)
+    // Begin exiting fullscreen before pausing so the host chooser is visible.
     const exited = document.fullscreenElement
       ? document.exitFullscreen().catch(() => {
           if (document.fullscreenElement)
@@ -278,6 +312,7 @@ function Playback({
       aria-busy={status === 'loading' || status === 'starting' || buffering}
       className={className ? `libmedia-player ${className}` : 'libmedia-player'}
       style={style}
+      data-page-fullscreen={pageFullscreen || undefined}
       data-visible={visible}
       data-panel-open={panelOpen}
       onBlur={(event) => {
@@ -309,15 +344,18 @@ function Playback({
         if (event.pointerType === 'mouse') revealControls()
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && panelOpen) {
+        if (event.key === 'Escape' && (panelOpen || pageFullscreen)) {
           event.preventDefault()
           event.stopPropagation()
-          closePanel()
+          if (panelOpen) closePanel()
+          else setPageFullscreen(false)
           return
         }
         if (
-          event.target !== event.currentTarget ||
+          (event.target !== event.currentTarget &&
+            event.target !== stage.current) ||
           !loaded ||
+          status === 'starting' ||
           event.altKey ||
           event.ctrlKey ||
           event.metaKey
@@ -329,8 +367,7 @@ function Playback({
         else if (event.key === 'm') playback.toggleMute()
         else if (event.key === 'c' && selectedSubtitle)
           playback.changeCaptions(!captions)
-        else if (event.key === 'f' && document.fullscreenEnabled)
-          void toggleFullscreen()
+        else if (event.key === 'f') void toggleFullscreen()
         else return
         revealControls()
         event.preventDefault()
@@ -339,102 +376,107 @@ function Playback({
       <style href="libmedia-react-player" precedence="default">
         {styles}
       </style>
-      <div className="lmp-viewport" ref={playback.viewport} />
-      {bitmapSubtitle && captions && selectedSubtitle && status !== 'error' && (
-        <BitmapSubtitles
-          key={selectedSubtitle.id}
-          track={bitmapSubtitle}
-          clock={playback.subtitleClock}
-        />
-      )}
-      {styledSubtitle &&
-        styledSubtitleStatus !== 'fallback' &&
-        selectedSubtitle &&
-        media &&
-        status !== 'error' && (
-          <StyledSubtitles
-            key={selectedSubtitle.id}
-            trackId={selectedSubtitle.id}
-            track={styledSubtitle}
-            videoAspectRatio={media.videoAspectRatio}
-            visible={captions}
-            rendered={styledSubtitleStatus === 'styled'}
-            clock={playback.subtitleClock}
-            onStatus={playback.setStyledSubtitleStatus}
+      <div className="lmp-stage" ref={stage} tabIndex={-1}>
+        <div className="lmp-viewport" ref={playback.viewport} />
+        {bitmapSubtitle &&
+          captions &&
+          selectedSubtitle &&
+          status !== 'error' && (
+            <BitmapSubtitles
+              key={selectedSubtitle.id}
+              track={bitmapSubtitle}
+              clock={playback.subtitleClock}
+            />
+          )}
+        {styledSubtitle &&
+          styledSubtitleStatus !== 'fallback' &&
+          selectedSubtitle &&
+          media &&
+          status !== 'error' && (
+            <StyledSubtitles
+              key={selectedSubtitle.id}
+              trackId={selectedSubtitle.id}
+              track={styledSubtitle}
+              videoAspectRatio={media.videoAspectRatio}
+              visible={captions}
+              rendered={styledSubtitleStatus === 'styled'}
+              clock={playback.subtitleClock}
+              onStatus={playback.setStyledSubtitleStatus}
+            />
+          )}
+
+        {loaded && (playing || status === 'paused') && (
+          <button
+            className="lmp-surface"
+            type="button"
+            tabIndex={-1}
+            aria-label={playing ? labels.pause : labels.play}
+            onClick={() => {
+              if (pointerType.current === 'touch') {
+                if (visible) {
+                  window.clearTimeout(hideTimer.current)
+                  setIdle(true)
+                } else revealControls()
+              } else play()
+            }}
           />
         )}
 
-      {loaded && (playing || status === 'paused') && (
-        <button
-          className="lmp-surface"
-          type="button"
-          tabIndex={-1}
-          aria-label={playing ? labels.pause : labels.play}
-          onClick={() => {
-            if (pointerType.current === 'touch') {
-              if (visible) {
-                window.clearTimeout(hideTimer.current)
-                setIdle(true)
-              } else revealControls()
-            } else play()
-          }}
-        />
-      )}
+        {status === 'error' && (
+          <div className="lmp-message" role="alert">
+            Playback failed. Check the video URL and browser compatibility.
+          </div>
+        )}
 
-      {status === 'error' && (
-        <div className="lmp-message" role="alert">
-          Playback failed. Check the video URL and browser compatibility.
-        </div>
-      )}
-
-      {loaded && (!playing || !media?.live) && (
-        <CenterControls
-          status={status}
-          busy={busy}
-          time={time}
-          seekDuration={media?.live ? 0 : duration}
-          onPlay={play}
-          onSeek={playback.seek}
-        />
-      )}
-
-      {buffering && <span className="lmp-spinner" aria-hidden="true" />}
-
-      {(notice || fullscreenError) && (
-        <div className="lmp-notice" role="status">
-          {notice || fullscreenError}
-        </div>
-      )}
-
-      {loaded && (
-        <>
-          <PlayerControls
-            playback={playback}
-            media={media}
+        {loaded && (!playing || !media?.live) && (
+          <CenterControls
+            status={status}
+            busy={busy}
             time={time}
-            scrub={scrub}
-            chapterIndex={chapterIndex}
-            page={panelOpen ? page : undefined}
-            panelId={panelId}
-            fullscreen={fullscreen}
+            seekDuration={media?.live ? 0 : duration}
             onPlay={play}
-            onNextEpisode={onNextEpisode ? openNextEpisode : undefined}
-            onScrub={setScrub}
-            onFullscreen={toggleFullscreen}
-            onPanel={handlePanel}
+            onSeek={playback.seek}
           />
-          <PlayerPanel
-            id={panelId}
-            open={panelOpen}
-            page={page}
-            playback={playback}
-            media={media}
-            chapterIndex={chapterIndex}
-            onPage={setPage}
-            onClose={closePanel}
-          />
-        </>
-      )}
+        )}
+
+        {buffering && <span className="lmp-spinner" aria-hidden="true" />}
+
+        {(notice || fullscreenError) && (
+          <div className="lmp-notice" role="status">
+            {notice || fullscreenError}
+          </div>
+        )}
+
+        {loaded && (
+          <>
+            <PlayerControls
+              playback={playback}
+              media={media}
+              time={time}
+              scrub={scrub}
+              chapterIndex={chapterIndex}
+              page={panelOpen ? page : undefined}
+              panelId={panelId}
+              fullscreen={nativeFullscreen || pageFullscreen}
+              onPlay={play}
+              onNextEpisode={onNextEpisode ? openNextEpisode : undefined}
+              onScrub={setScrub}
+              onFullscreen={toggleFullscreen}
+              onPanel={handlePanel}
+            />
+            <PlayerPanel
+              id={panelId}
+              open={panelOpen}
+              page={page}
+              playback={playback}
+              media={media}
+              chapterIndex={chapterIndex}
+              onPage={setPage}
+              onClose={closePanel}
+            />
+          </>
+        )}
+      </div>
     </section>
   )
 }

@@ -62,7 +62,7 @@ export function PlayerControls({
   )
 
   return (
-    <div className="lmp-controls">
+    <div className="lmp-controls" inert={status === 'starting'}>
       {duration > 0 && (
         <Timeline
           chapters={chapters}
@@ -160,16 +160,14 @@ export function PlayerControls({
             </button>
           )}
         </div>
-        {document.fullscreenEnabled && (
-          <button
-            className="lmp-button"
-            type="button"
-            aria-label={fullscreen ? labels.exitFullscreen : labels.fullscreen}
-            onClick={onFullscreen}
-          >
-            <FullscreenIcon aria-hidden="true" />
-          </button>
-        )}
+        <button
+          className="lmp-button"
+          type="button"
+          aria-label={fullscreen ? labels.exitFullscreen : labels.fullscreen}
+          onClick={onFullscreen}
+        >
+          <FullscreenIcon aria-hidden="true" />
+        </button>
       </div>
     </div>
   )

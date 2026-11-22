@@ -16,16 +16,30 @@
 
 .lmp-panel {
   --lmp-edge: clamp(10px, 1.6cqw, 22px);
+  --lmp-panel-bottom: calc(78px + var(--lmp-safe-bottom, 0px));
   --lmp-lift: 8px;
   position: absolute;
   z-index: 4;
-  right: var(--lmp-edge);
-  bottom: 78px;
+  right: calc(var(--lmp-edge) + var(--lmp-safe-right, 0px));
+  bottom: var(--lmp-panel-bottom);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  width: min(332px, 100% - 2 * var(--lmp-edge));
-  max-height: min(408px, 100% - 78px - var(--lmp-edge));
+  width: min(
+    332px,
+    100% -
+    2 *
+    var(--lmp-edge) -
+    var(--lmp-safe-left, 0px) -
+    var(--lmp-safe-right, 0px)
+  );
+  max-height: min(
+    408px,
+    100% -
+    var(--lmp-panel-bottom) -
+    var(--lmp-edge) -
+    var(--lmp-safe-top, 0px)
+  );
   overflow: hidden;
   transform: translateY(var(--lmp-lift)) scale(0.98);
   transform-origin: bottom right;
@@ -37,7 +51,7 @@
 
 .lmp-panel[data-panel="chapters"] {
   right: auto;
-  left: var(--lmp-edge);
+  left: calc(var(--lmp-edge) + var(--lmp-safe-left, 0px));
   transform-origin: bottom left;
 }
 
@@ -259,9 +273,16 @@
 
   .libmedia-player .lmp-panel {
     --lmp-lift: 18px;
-    inset: auto 6px 6px;
+    inset: auto calc(6px + var(--lmp-safe-right, 0px))
+      calc(6px + var(--lmp-safe-bottom, 0px))
+      calc(6px + var(--lmp-safe-left, 0px));
     width: auto;
-    max-height: calc(100% - 12px);
+    max-height: calc(
+      100% -
+      12px -
+      var(--lmp-safe-top, 0px) -
+      var(--lmp-safe-bottom, 0px)
+    );
     transform-origin: bottom center;
   }
 

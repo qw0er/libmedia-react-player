@@ -6,8 +6,6 @@
   --lmp-panel: #191c23;
   --lmp-highlight: var(--libmedia-player-accent, #b6d4ff);
   position: relative;
-  container-type: inline-size;
-  isolation: isolate;
   overflow: hidden;
   background: #000;
   color: #fff;
@@ -25,6 +23,39 @@
 .libmedia-player:fullscreen {
   width: 100%;
   height: 100%;
+}
+
+.lmp-stage {
+  position: absolute;
+  inset: 0;
+  container-type: inline-size;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.libmedia-player[data-page-fullscreen] > .lmp-stage {
+  --lmp-safe-top: env(safe-area-inset-top, 0px);
+  --lmp-safe-right: env(safe-area-inset-right, 0px);
+  --lmp-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --lmp-safe-left: env(safe-area-inset-left, 0px);
+  position: fixed;
+  z-index: 2147483647;
+  inset: 0;
+  box-sizing: border-box;
+  width: auto;
+  height: var(--lmp-page-height, 100%);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: inherit;
+  color: inherit;
+  overscroll-behavior: none;
+}
+
+@supports (height: 100dvh) {
+  .libmedia-player[data-page-fullscreen] > .lmp-stage {
+    --lmp-page-height: 100dvh;
+  }
 }
 
 .lmp-viewport,
@@ -80,7 +111,7 @@
 }
 
 .libmedia-player:focus-visible,
-.libmedia-player :is(button, input, .lmp-panel):focus-visible {
+.libmedia-player :is(button, input, .lmp-panel, .lmp-stage):focus-visible {
   outline: 2px solid #fff;
   outline-offset: -2px;
 }
@@ -195,16 +226,19 @@
 }
 
 .lmp-notice {
-  top: 10px;
+  top: calc(10px + var(--lmp-safe-top, 0px));
   left: 50%;
   transform: translateX(-50%);
 }
 
 .lmp-controls {
+  --lmp-control-edge: clamp(10px, 1.6cqw, 22px);
   position: absolute;
   z-index: 2;
   inset: auto 0 0;
-  padding: 20px clamp(10px, 1.6cqw, 22px) 6px;
+  padding: 20px calc(var(--lmp-control-edge) + var(--lmp-safe-right, 0px))
+    calc(6px + var(--lmp-safe-bottom, 0px))
+    calc(var(--lmp-control-edge) + var(--lmp-safe-left, 0px));
   background: linear-gradient(transparent, rgb(0 0 0 / 82%));
   transition: opacity 150ms ease;
 }
@@ -468,7 +502,8 @@
     display: flex;
     flex-direction: column;
     justify-content: end;
-    padding: 0 8px;
+    padding: 0 calc(8px + var(--lmp-safe-right, 0px))
+      var(--lmp-safe-bottom, 0px) calc(8px + var(--lmp-safe-left, 0px));
     background:
       linear-gradient(rgb(0 0 0 / 62%), transparent) top / 100% 48px no-repeat,
       linear-gradient(transparent, rgb(0 0 0 / 82%)) bottom / 100% 84px
@@ -495,8 +530,8 @@
 
   .lmp-options {
     position: absolute;
-    top: 4px;
-    right: 8px;
+    top: calc(4px + var(--lmp-safe-top, 0px));
+    right: calc(8px + var(--lmp-safe-right, 0px));
   }
 
   .libmedia-player

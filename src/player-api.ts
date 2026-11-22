@@ -191,8 +191,8 @@ export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   /** Inline CSS styles for the player root. */
   style?: CSSProperties
   /**
-   * Shows the Next episode button. Activating it pauses playback, exits any
-   * document fullscreen, and then calls this handler, so a host chooser portaled
+   * Shows the Next episode button. Activating it pauses playback, exits
+   * fullscreen, and then calls this handler, so a host chooser portaled
    * outside the player is visible. Playback stays paused until the host resumes
    * it.
    */

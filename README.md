@@ -18,7 +18,7 @@ export default function App() {
 
 - **Chapters** — Open the time display when it shows a chevron.
 - **Subtitles** — Use **CC** to toggle captions. Select tracks and adjust subtitle delay in **Settings**.
-- **Keyboard** — Focus the player. **Space** or **K** plays or pauses, **← / →** seeks five seconds, **M** mutes, **C** toggles captions, **F** toggles fullscreen, and **Esc** closes an open menu.
+- **Keyboard** — Focus the player. **Space** or **K** plays or pauses, **← / →** seeks five seconds, **M** mutes, **C** toggles captions, **F** toggles fullscreen, and **Esc** closes an open menu or exits page fullscreen.
 
 ## Formats and decoding
 
@@ -118,14 +118,15 @@ Use `sourceFormat` when the URL has no file extension. The player applies `media
 | `ref`               | `Ref<LibmediaPlayerHandle>` for playback commands                                  |
 
 The player defaults to full container width and a 16:9 ratio. Use `className`
-for responsive layout or `style` for a local override. Fullscreen fills the
-screen and restores the host layout on exit.
+for responsive layout or `style` for a local override. The fullscreen button uses
+browser fullscreen where available. On iPhone Safari and other browsers without
+element fullscreen, it expands the player to the visible page viewport, including
+its subtitles and controls. The browser toolbar remains under browser control.
 
 The host owns the next-episode chooser. Activating the button pauses playback
-and, when the document is fullscreen, exits fullscreen before `onNextEpisode`
-runs, so a chooser portaled to `body` is visible. Playback stays paused until
-the host resumes it. A chosen episode starts windowed; the player does not keep
-fullscreen or continue playback across episodes.
+and exits fullscreen before `onNextEpisode` runs, so a chooser portaled to
+`body` is visible. Playback stays paused until the host resumes it. A chosen
+episode starts windowed.
 
 ```tsx
 ;<LibmediaPlayer src={url} style={{ aspectRatio: '4 / 3' }} />
