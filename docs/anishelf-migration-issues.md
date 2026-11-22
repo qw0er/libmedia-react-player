@@ -116,24 +116,6 @@ Anishelf acceptance checks.
       touch selection remain part of acceptance.
       [Next episode](../src/LibmediaPlayer.tsx#L229) · [Fullscreen control](../src/LibmediaPlayer.tsx#L217)
 
-- [ ] **Integrate progress, completion, and audio with the real backend.**
-      The player fixture exercised resume, seeks, audio stream switching, and
-      natural end. Anishelf still needs to map position and track IDs between the
-      source file and the selected original or prepared asset. **Fix.** Bind
-      playback events to the active asset using the event `sessionId`, use the
-      settled restore result before enabling autoplay or progress writes, and
-      preserve saved progress after a failed restore. Read `getSnapshot()` for
-      the latest position when saving on page hide or unmount. Break viewing
-      continuity on pause, seek, buffering, or speed changes. Pass natural
-      completion through the existing Anishelf completion rules. Map audio
-      indices in both directions and preserve explicit silence.
-      **Verify.** Test reload and resume, switching to a prepared copy with a
-      different time origin and renumbered same-language audio tracks, 2× playback,
-      buffering, seeking to the last frame, and natural completion. Rapidly switch
-      episodes while a save is pending and verify that each file keeps its own
-      progress.
-      [Playback events and controls](../README.md#events)
-
 - [ ] **Keep playback assets out of the Web app shell precache.** Anishelf
       currently matches JavaScript broadly and excludes Movi and existing Worker
       assets by name. Libmedia ships lazy runtime, decoder, and styled subtitle
