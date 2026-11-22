@@ -116,18 +116,6 @@ Anishelf acceptance checks.
       touch selection remain part of acceptance.
       [Next episode](../src/LibmediaPlayer.tsx#L229) · [Fullscreen control](../src/LibmediaPlayer.tsx#L217)
 
-- [ ] **Keep playback assets out of the Web app shell precache.** Anishelf
-      currently matches JavaScript broadly and excludes Movi and existing Worker
-      assets by name. Libmedia ships lazy runtime, decoder, and styled subtitle
-      chunks. **Fix.** Update chunk naming and Workbox exclusions against the
-      actual rebundled Anishelf output. Preserve lazy loading for the runtime,
-      software decoders, and styled renderer. **Verify.** Inspect the production
-      precache manifest and network requests on a clean install and a service
-      worker update. Loading the library home should fetch no playback runtime or
-      decoder. Opening a video and selecting styled subtitles should fetch their
-      respective assets on demand.
-      [Lazy runtime and decoder loading](../src/bundledPlayer.ts#L26)
-
 - [ ] **Pin and validate the release before switching the default.** The
       invalid-sidecar URL fix is present at `c5bab07`, after the `v1.2.0` tag. The
       reviewed build reported a bad URL as a nonfatal track error and continued with
