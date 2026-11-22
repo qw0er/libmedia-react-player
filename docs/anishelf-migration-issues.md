@@ -116,19 +116,6 @@ Anishelf acceptance checks.
       touch selection remain part of acceptance.
       [Next episode](../src/LibmediaPlayer.tsx#L229) · [Fullscreen control](../src/LibmediaPlayer.tsx#L217)
 
-- [ ] **Pin and validate the release before switching the default.** The
-      invalid-sidecar URL fix is present at `c5bab07`, after the `v1.2.0` tag. The
-      reviewed build reported a bad URL as a nonfatal track error and continued with
-      a valid sidecar. **Fix.** Publish and pin a release containing the fix and the
-      changes required by this checklist. Run the relevant regression cases against
-      the installed package. Retire the old playback and subtitle paths according
-      to the recorded compatibility decisions. **Verify.** Run `npm run check`
-      and `npm run build`, then record results from production Web and packaged
-      Electron against the real backend. Include 1080p HEVC Main 10 software decode
-      with audio, non-16:9 layout, authenticated seeking on original and prepared
-      copies, and the recovery cases above. Record the package version, runtime,
-      device, sample, and any accepted limitations.
-
 At the reviewed baseline, `npm run check` and `npm run build` passed. Chrome
 157 and the Linux ASAR consumer covered parts of the checklist with local
 fixtures. Full Anishelf acceptance is pending.
