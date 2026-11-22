@@ -1,8 +1,199 @@
 @import "tailwindcss";
-@source not "../vendor/libmedia";
+@source not "../deps/libmedia";
 
 @layer base {
   body {
-    @apply scheme-dark bg-neutral-900 font-sans text-neutral-100;
+    @apply scheme-dark bg-slate-950 font-sans text-slate-100 antialiased;
+  }
+
+  h1 {
+    @apply text-2xl font-semibold tracking-tight sm:text-3xl;
+  }
+
+  h2 {
+    @apply text-base font-semibold wrap-anywhere;
+  }
+
+  h3 {
+    @apply text-sm font-semibold;
+  }
+}
+
+@layer components {
+  .workspace {
+    @apply mx-auto max-w-[90rem] p-4 sm:p-7;
+  }
+
+  .page-header {
+    @apply mb-6 flex flex-wrap items-center justify-between gap-3;
+  }
+
+  .environment {
+    @apply rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300;
+  }
+
+  .workspace-grid {
+    @apply grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem];
+  }
+
+  .preview-column {
+    @apply grid min-w-0 gap-4;
+  }
+
+  .panel {
+    @apply min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-4;
+  }
+
+  .section-header {
+    @apply flex flex-wrap items-center justify-between gap-3;
+  }
+
+  .stage {
+    @apply my-4 rounded-lg bg-black;
+  }
+
+  .screen {
+    @apply mx-auto;
+  }
+
+  .empty-preview {
+    @apply grid aspect-video place-items-center p-4 text-center text-sm text-slate-400;
+  }
+
+  .readouts {
+    @apply grid grid-cols-2 gap-4 text-sm xl:grid-cols-4;
+  }
+
+  .readouts dt {
+    @apply text-xs text-slate-400;
+  }
+
+  .readouts dd {
+    @apply mt-1 font-medium wrap-anywhere tabular-nums;
+  }
+
+  .source-form,
+  .commands {
+    @apply grid gap-3;
+  }
+
+  .field-grid,
+  .command-fields {
+    @apply grid items-end gap-3;
+  }
+
+  .command-fields {
+    @apply sm:grid-cols-2;
+  }
+
+  .source-form details,
+  .scenario {
+    @apply rounded-lg border border-slate-700/75 p-3 text-sm;
+  }
+
+  .source-form details[open] > :not(summary),
+  .scenario > :not(h3) {
+    @apply mt-3;
+  }
+
+  .source-form summary {
+    @apply cursor-pointer font-medium;
+  }
+
+  .workspace label {
+    @apply grid min-w-0 gap-1.5 text-xs font-medium text-slate-300;
+  }
+
+  .workspace .inline-field {
+    @apply flex items-end gap-2;
+  }
+
+  .workspace .section-header .inline-field,
+  .workspace .check {
+    @apply flex items-center gap-2;
+  }
+
+  .workspace
+    :where(input:not([type="checkbox"]), select, textarea, button):not(
+      .stage *
+    ) {
+    @apply min-w-0 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-offset-2 focus-visible:outline-2 focus-visible:outline-cyan-300;
+  }
+
+  .workspace
+    :where(input:not([type="checkbox"]), select, textarea):not(.stage *) {
+    @apply w-full;
+  }
+
+  .workspace .section-header select {
+    @apply w-auto;
+  }
+
+  .workspace input[type="file"]::file-selector-button {
+    @apply mr-3 cursor-pointer text-cyan-200;
+  }
+
+  .workspace input[type="checkbox"] {
+    @apply accent-cyan-300;
+  }
+
+  .workspace button:not(.stage *) {
+    @apply cursor-pointer bg-slate-800 hover:bg-slate-700 disabled:cursor-default disabled:opacity-40;
+  }
+
+  .workspace button.primary {
+    @apply border-cyan-300 bg-cyan-300 font-semibold text-slate-950 hover:bg-cyan-200;
+  }
+
+  .button-row {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .muted {
+    @apply text-xs text-slate-400;
+  }
+
+  .error {
+    @apply text-sm text-rose-300;
+  }
+
+  .event-log {
+    @apply mt-4;
+  }
+
+  .trace {
+    @apply mt-3 max-h-80 overflow-auto rounded-lg border border-slate-800 bg-slate-950 font-mono text-xs;
+  }
+
+  .trace li {
+    @apply grid gap-x-4 gap-y-1 border-b border-slate-800 px-3 py-2 sm:grid-cols-[auto_minmax(0,1fr)] xl:grid-cols-[auto_13rem_minmax(0,1fr)];
+  }
+
+  .trace li:last-child {
+    @apply border-b-0;
+  }
+
+  .trace time {
+    @apply text-slate-400;
+  }
+
+  .trace code {
+    @apply wrap-anywhere text-slate-300 sm:col-span-2 xl:col-span-1;
+  }
+
+  .event-log > .muted {
+    @apply mt-3;
+  }
+
+  .chooser {
+    @apply m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-700 bg-slate-900 p-4 text-slate-100 backdrop:bg-black/70;
+  }
+
+  .chooser ul {
+    @apply mt-3 grid max-h-[55vh] gap-2 overflow-auto;
+  }
+
+  .chooser li button {
+    @apply w-full text-left wrap-anywhere;
   }
 }

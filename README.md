@@ -204,13 +204,22 @@ Cross-Origin-Embedder-Policy: require-corp
 
 ## Development
 
-Use Node.js 22.13+ in the 22.x series or Node.js 24+. Place a video in `.temp/` to use it in the demo.
+Use Node.js 22.13+ in the 22.x series or Node.js 24+.
 
 ```sh
 npm ci
 npm run setup:libmedia
 npm run dev
 ```
+
+### Playback test bench
+
+- Choose a fixture from `.temp/` or one of its subdirectories, open a local media file, or enter a media URL. Choose **Load source** to apply changes to subtitles, start position, initial audio, and HTTP settings.
+- Add subtitle files or URLs under **External subtitles**. For styled local ASS/SSA, select the script and its fonts together. For VobSub, select the matching IDX and SUB files together.
+- Use **Host controls** to call the player API directly. **Retry** reloads with the active settings. **Retry with edited URL and HTTP options** applies a refreshed URL or request credentials while preserving the playback position.
+- To test the final SRT cue, enable **Add final SRT cue fixture** and load a video longer than eight seconds. Play and select **Demo final cue** in the player settings. Pause, seek inside or past the cue with the preset buttons, then resume.
+- Choose the 390 px viewport to test narrow controls. In fullscreen, select **Next episode** to check that the player pauses and exits fullscreen before the chooser opens. Select another fixture to start it windowed.
+- The event log shows the latest 100 entries. Use **Copy JSONL** to export them in chronological order, and enable **Log progress** when you need periodic time updates.
 
 | Command                  | Purpose                                                                                  |
 | ------------------------ | ---------------------------------------------------------------------------------------- |
@@ -222,6 +231,35 @@ The submodule pins the source of both the browser runtime and TypeScript declara
 Run `npm run setup:libmedia` on a fresh checkout. Run `npm run build:libmedia`
 after editing the fork locally. The React package includes the built assets,
 so package consumers can install it without checking out the submodule.
+
+### Tests
+
+| Command             | Coverage                                                                   |
+| ------------------- | -------------------------------------------------------------------------- |
+| `npm test`          | Run both suites                                                            |
+| `npm run test:unit` | Run Vitest for seek bounds, error classification, and session cancellation |
+| `npm run test:e2e`  | Build the library and run Playwright in Google Chrome                      |
+
+Run the development setup above first. The browser suite requires Google Chrome
+and starts a local Vite server on an available port. It imports the built library through
+its public package entry point and serves a synthetic H.264/AAC Matroska fixture
+with embedded SRT subtitles behind an authenticated byte-range endpoint. It
+covers playback, mouse and touch seeking, subtitles, and recovery after HTTP 401.
+Failing runs retain traces in `test-results/` for `npx playwright show-trace`.
+
+The paused seek into an already-active embedded SRT cue is marked as an expected
+failure. When it starts passing, remove the expected-failure annotation.
+
+To regenerate the fixture with FFmpeg and libx264:
+
+```sh
+ffmpeg -y -f lavfi -i 'testsrc2=size=160x90:rate=10:duration=12' \
+  -f lavfi -i 'sine=frequency=440:sample_rate=48000:duration=12' \
+  -i test/fixtures/playback.srt -c:v libx264 -preset fast -crf 34 \
+  -g 10 -keyint_min 10 -sc_threshold 0 -threads:v 1 -c:a aac -b:a 32k \
+  -c:s srt -metadata:s:s:0 language=eng -metadata:s:s:0 title=English \
+  test/fixtures/playback.mkv
+```
 
 ## License
 

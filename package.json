@@ -21,6 +21,9 @@
     "lint": "biome lint .",
     "typecheck": "tsc -b",
     "check": "biome check . && npm run typecheck",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
     "prepack": "npm run build"
   },
   "dependencies": {
@@ -30,6 +33,7 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@biomejs/biome": "2.6.8",
+    "@playwright/test": "^1.65.1",
     "@rolldown/plugin-babel": "^0.3.0",
     "@tailwindcss/vite": "^4.3.5",
     "@types/babel__core": "^7.20.5",
@@ -44,7 +48,8 @@
     "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.5",
     "typescript": "~6.0.3",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "vitest": "^5.1.1"
   },
   "files": [
     "dist",

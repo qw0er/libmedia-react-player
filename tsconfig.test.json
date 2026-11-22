@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "lib": ["ES2024", "DOM"],
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@qw0er/libmedia-avplayer": [
+        "./deps/libmedia/packages/avplayer/dist/browser-types/packages/avplayer/src/AVPlayer.d.ts"
+      ],
+      "libmedia-react-player": ["./src/LibmediaPlayer.tsx"]
+    }
+  },
+  "include": ["test", "playwright.config.ts", "vitest.config.ts"]
+}

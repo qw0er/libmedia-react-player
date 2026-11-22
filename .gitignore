@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 
 .temp
+
+# Playwright
+/playwright-report/
+/test-results/
