@@ -120,11 +120,13 @@ Anishelf acceptance checks.
       The player fixture exercised resume, seeks, audio stream switching, and
       natural end. Anishelf still needs to map position and track IDs between the
       source file and the selected original or prepared asset. **Fix.** Bind
-      playback events to the active asset, use the settled restore result before
-      enabling autoplay or progress writes, and preserve saved progress after a
-      failed restore. Break viewing continuity on pause, seek, buffering, or speed
-      changes. Pass natural completion through the existing Anishelf completion
-      rules. Map audio indices in both directions and preserve explicit silence.
+      playback events to the active asset using the event `sessionId`, use the
+      settled restore result before enabling autoplay or progress writes, and
+      preserve saved progress after a failed restore. Read `getSnapshot()` for
+      the latest position when saving on page hide or unmount. Break viewing
+      continuity on pause, seek, buffering, or speed changes. Pass natural
+      completion through the existing Anishelf completion rules. Map audio
+      indices in both directions and preserve explicit silence.
       **Verify.** Test reload and resume, switching to a prepared copy with a
       different time origin and renumbered same-language audio tracks, 2× playback,
       buffering, seeking to the last frame, and natural completion. Rapidly switch

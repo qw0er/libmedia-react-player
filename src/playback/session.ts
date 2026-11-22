@@ -23,6 +23,14 @@ import {
 } from './tracks'
 
 const progressIntervalMs = 1000
+let fallbackSessionSequence = 0
+
+/** Identifies one load attempt; retries and source changes start a new session. */
+export function createPlaybackSessionId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `playback-${++fallbackSessionSequence}`
+  )
+}
 
 type PositionPublication = 'sample' | 'force'
 type EmitEvent = (notify: (events: LibmediaPlayerEvents) => void) => void
@@ -74,6 +82,7 @@ interface SessionCallbacks {
 export function startPlaybackSession(
   container: HTMLDivElement,
   source: PlaybackSource,
+  sessionId: string,
   callbacks: SessionCallbacks,
 ) {
   const { src, initialAudio, initialPositionMs } = source
@@ -93,17 +102,18 @@ export function startPlaybackSession(
     })
   }
 
-  function publishState(state: LibmediaPlaybackState) {
+  function publishState(state: Omit<LibmediaPlaybackState, 'sessionId'>) {
+    const next = { ...state, sessionId }
     const previous = lastReportedState
     if (
-      previous?.status === state.status &&
-      previous.buffering === state.buffering &&
-      previous.playbackRate === state.playbackRate &&
-      previous.seeking === state.seeking
+      previous?.status === next.status &&
+      previous.buffering === next.buffering &&
+      previous.playbackRate === next.playbackRate &&
+      previous.seeking === next.seeking
     )
       return
-    lastReportedState = state
-    emit((events) => events.onPlaybackStateChange?.(state))
+    lastReportedState = next
+    emit((events) => events.onPlaybackStateChange?.(next))
   }
 
   function publishErrorState() {
@@ -134,6 +144,7 @@ export function startPlaybackSession(
     emit((events) =>
       events.onError?.({
         src,
+        sessionId,
         operation,
         message,
         fatal: true,
@@ -172,7 +183,8 @@ export function startPlaybackSession(
       setTracks: callbacks.setTracks,
       setVolume: callbacks.setVolume,
       setDelay: callbacks.setDelay,
-      onTrackChange: (event) => emit((events) => events.onTrackChange?.(event)),
+      onTrackChange: (event) =>
+        emit((events) => events.onTrackChange?.({ ...event, sessionId })),
       onError: (message) => playback.reportError('track', message, false),
     })
     const player = new AVPlayer({
@@ -233,6 +245,7 @@ export function startPlaybackSession(
         const duration = playback.media?.duration ?? 0
         return {
           src,
+          sessionId,
           positionMs,
           durationMs: duration > 0 ? duration : null,
         }
@@ -264,6 +277,7 @@ export function startPlaybackSession(
         emit((events) =>
           events.onError?.({
             src,
+            sessionId,
             operation,
             message,
             fatal,

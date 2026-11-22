@@ -7,12 +7,17 @@ import {
   useState,
 } from 'react'
 import { createPlaybackCommands } from './playback/commands'
-import { type PlaybackSession, startPlaybackSession } from './playback/session'
+import {
+  createPlaybackSessionId,
+  type PlaybackSession,
+  startPlaybackSession,
+} from './playback/session'
 import type { MediaInfo } from './playback/source'
 import type { TrackSelection } from './playback/tracks'
 import type {
   ExternalSubtitleTrack,
   LibmediaAudioSelection,
+  LibmediaPlaybackSnapshot,
   LibmediaPlaybackStatus,
   LibmediaPlayerEvents,
   LibmediaRequestOptions,
@@ -43,6 +48,17 @@ export function usePlayback(
   const listeners = useRef(events)
   const stalled = useRef(false)
   const latest = useRef({ position: 0, loaded: false })
+  const sessionId = useRef('')
+  const snapshot = useRef<LibmediaPlaybackSnapshot>({
+    sessionId: '',
+    src,
+    status: 'loading',
+    buffering: false,
+    playbackRate: 1,
+    seeking: false,
+    positionMs: initialPositionMs ?? 0,
+    durationMs: null,
+  })
   const [restart, setRestart] = useState<Restart>()
   const [status, setStatus] = useState<LibmediaPlaybackStatus>('loading')
   const [media, setMedia] = useState<MediaInfo>()
@@ -84,6 +100,8 @@ export function usePlayback(
   useLayoutEffect(() => {
     const container = viewport.current
     if (!container) return
+    const attemptId = createPlaybackSessionId()
+    sessionId.current = attemptId
     return startPlaybackSession(
       container,
       {
@@ -94,6 +112,7 @@ export function usePlayback(
         initialPositionMs: activePosition,
         initialAudio,
       },
+      attemptId,
       {
         setStatus,
         setPosition,
@@ -108,6 +127,7 @@ export function usePlayback(
         onReady(next, media) {
           session.current = next
           setMedia(media)
+          setRate(next.player.getPlaybackRate())
         },
         onDispose() {
           session.current = null
@@ -124,6 +144,19 @@ export function usePlayback(
     initialAudio,
     restart,
   ])
+
+  useLayoutEffect(() => {
+    snapshot.current = {
+      sessionId: sessionId.current,
+      src: activeSrc,
+      positionMs: pendingSeek ?? position,
+      durationMs: media && media.duration > 0 ? media.duration : null,
+      status,
+      playbackRate: rate,
+      seeking: pendingSeek !== undefined,
+      buffering,
+    }
+  })
 
   const retry = useCallback(
     (options?: LibmediaRetryOptions) => {
@@ -145,6 +178,8 @@ export function usePlayback(
     [src, initialPositionMs],
   )
 
+  const getSnapshot = useCallback(() => snapshot.current, [])
+
   const commands = useMemo(
     () =>
       createPlaybackCommands(session, { setBusy, setNotice, setPendingSeek }),
@@ -160,6 +195,7 @@ export function usePlayback(
     viewport,
     controls,
     retry,
+    getSnapshot,
     status,
     media,
     buffered,

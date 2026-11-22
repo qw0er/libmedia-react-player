@@ -54,7 +54,7 @@ interface TrackCallbacks {
   setTracks: (selection: TrackSelection) => void
   setVolume: (volume: number) => void
   setDelay: (delay: number) => void
-  onTrackChange: (event: LibmediaTrackChangeEvent) => void
+  onTrackChange: (event: Omit<LibmediaTrackChangeEvent, 'sessionId'>) => void
   onError: (message: string) => void
 }
 

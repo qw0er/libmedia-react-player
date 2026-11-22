@@ -30,6 +30,7 @@ export type {
   LibmediaErrorReason,
   LibmediaInitialPositionResult,
   LibmediaPlaybackProgress,
+  LibmediaPlaybackSnapshot,
   LibmediaPlaybackState,
   LibmediaPlaybackStatus,
   LibmediaPlayerError,
@@ -39,6 +40,7 @@ export type {
   LibmediaRequestOptions,
   LibmediaRetryOptions,
   LibmediaSeekEvent,
+  LibmediaSessionEvent,
   LibmediaTrack,
   LibmediaTrackChangeEvent,
 } from './player-api'
@@ -133,10 +135,15 @@ function Playback({
     events,
   )
   const { controls } = playback
-  useImperativeHandle(ref, () => ({ ...controls, retry: playback.retry }), [
-    controls,
-    playback.retry,
-  ])
+  useImperativeHandle(
+    ref,
+    () => ({
+      ...controls,
+      retry: playback.retry,
+      getSnapshot: playback.getSnapshot,
+    }),
+    [controls, playback.retry, playback.getSnapshot],
+  )
   const {
     media,
     status,

@@ -35,19 +35,30 @@ export type LibmediaPlaybackStatus =
   | 'ended'
   | 'error'
 
-export interface LibmediaPlaybackProgress {
+/** Identifies the load attempt that produced a playback event. */
+export interface LibmediaSessionEvent {
+  sessionId: string
+}
+
+export interface LibmediaPlaybackProgress extends LibmediaSessionEvent {
   src: string
   positionMs: number
   /** Null when the duration is unknown or the source is live. */
   durationMs: number | null
 }
 
-export interface LibmediaPlaybackState {
+export interface LibmediaPlaybackState extends LibmediaSessionEvent {
   src: string
   status: LibmediaPlaybackStatus
   buffering: boolean
   playbackRate: number
   seeking: boolean
+}
+
+/** A synchronous view of the current session, such as for saving on page hide. */
+export interface LibmediaPlaybackSnapshot extends LibmediaPlaybackState {
+  positionMs: number
+  durationMs: number | null
 }
 
 export interface LibmediaSeekEvent extends LibmediaPlaybackProgress {
@@ -73,7 +84,7 @@ export interface LibmediaAudioTrack extends LibmediaTrack {
 /** Select a file stream index, or pass null for silence at the current volume. */
 export type LibmediaAudioSelection = number | null
 
-export interface LibmediaTrackChangeEvent {
+export interface LibmediaTrackChangeEvent extends LibmediaSessionEvent {
   src: string
   audio: LibmediaAudioTrack | null
   /** Null when subtitles are off or no supported track is selected. */
@@ -105,7 +116,7 @@ export type LibmediaErrorReason =
   /** The failure could not be classified. */
   | 'unknown'
 
-export interface LibmediaPlayerError {
+export interface LibmediaPlayerError extends LibmediaSessionEvent {
   src: string
   operation: 'load' | 'playback' | 'play' | 'pause' | 'seek' | 'track'
   message: string
@@ -135,6 +146,8 @@ export interface LibmediaPlayerHandle {
    * `onError` before issuing playback commands.
    */
   retry(options?: LibmediaRetryOptions): void
+  /** Reads the current position, duration, and playback state without waiting for an event. */
+  getSnapshot(): LibmediaPlaybackSnapshot
 }
 
 export interface LibmediaPlayerEvents {

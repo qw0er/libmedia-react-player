@@ -79,7 +79,7 @@ export function createPlaybackCommands(
     })
   }
 
-  const controls: Omit<LibmediaPlayerHandle, 'retry'> = {
+  const controls: Omit<LibmediaPlayerHandle, 'retry' | 'getSnapshot'> = {
     play() {
       return run(
         'play',

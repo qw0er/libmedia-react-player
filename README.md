@@ -125,7 +125,7 @@ fullscreen or continue playback across episodes.
 | `onError`                 | Failed operation, display-safe message, stable `reason`, HTTP status when one was observed, and whether the error is fatal                                     |
 
 - Time values are in milliseconds. Duration is `null` for live streams or unknown durations.
-- Events include `src` and come from the active playback session.
+- Events include `src` and a `sessionId` for the load attempt. The id changes after `retry()` or a remount, so discard events from a session you replaced.
 - An audio or subtitle value of `null` in `onTrackChange` means that track type has no active output.
 
 ### Errors and recovery
@@ -157,8 +157,11 @@ When the browser blocks autoplay, `play()` rejects with `NotAllowedError` and le
 | `seekTo(positionMs)`       | Resolve to the settled position in milliseconds                                                                                |
 | `selectAudio(streamIndex)` | Select a file stream index. Pass `null` for silence. Selecting a track again restores the viewer's volume                      |
 | `retry(options?)`          | Restart the current source at the current position. Pass `{ mediaRequest }` or `{ src }` to recover with refreshed credentials |
+| `getSnapshot()`            | Read `sessionId`, `src`, position, duration, status, rate, seeking, and buffering without waiting for an event                 |
 
 `retry()` reports the outcome through `onReady` or `onError`, like the initial load. After a fatal `load` error it resumes at the supplied `initialPositionMs`; after a fatal `playback` error it resumes at the last reported position. It does not start playback, so request a user gesture before calling `play()` when the browser requires one.
+
+Call `getSnapshot()` when the page hides or the player unmounts to save the latest position synchronously instead of waiting for the next event.
 
 See [TypeScript definitions](src/player-api.ts) for full signatures.
 
