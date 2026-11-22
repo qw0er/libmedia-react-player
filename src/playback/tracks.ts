@@ -19,12 +19,18 @@ export type StyledSubtitleSource =
   | Extract<ExternalSubtitleTrack, { renderer: 'styled' }>
   | { load: (signal: AbortSignal) => Promise<StyledSubtitleResources> }
 
+export interface PgsSubtitleSource {
+  load: (signal: AbortSignal) => Promise<Uint8Array>
+  onError: () => void
+}
+
 export interface TrackSelection {
   selectedAudio?: MediaInfo['audio'][number]
   selectedSubtitle?: MediaInfo['subtitles'][number]
   captions: boolean
   styledSubtitle?: StyledSubtitleSource
   styledSubtitleStatus?: StyledSubtitleStatus
+  pgsSubtitle?: PgsSubtitleSource
 }
 
 interface TrackPlayback {
@@ -41,6 +47,10 @@ interface TrackCallbacks {
     id: number,
     signal: AbortSignal,
   ) => Promise<StyledSubtitleResources | undefined>
+  loadEmbeddedPgs: (
+    id: number,
+    signal: AbortSignal,
+  ) => Promise<Uint8Array | undefined>
   setTracks: (selection: TrackSelection) => void
   setVolume: (volume: number) => void
   setDelay: (delay: number) => void
@@ -63,8 +73,10 @@ export function createPlaybackTracks(
   let userSubtitleDelay = 0
   let subtitleOffset = 0
   let selection: TrackSelection | undefined
+  let selectedPgsId: number | undefined
   let sidecars = new Map<number, ExternalSubtitleTrack>()
   const embeddedAss = new Map<number, StyledSubtitleResources>()
+  const embeddedPgs = new Map<number, Uint8Array>()
   const failedStyledSubtitles = new Set<number>()
 
   function setVolume(level: number) {
@@ -148,6 +160,45 @@ export function createPlaybackTracks(
     }
   }
 
+  function pgsSource(id: number): PgsSubtitleSource {
+    return {
+      async load(signal) {
+        const cached = embeddedPgs.get(id)
+        if (cached) return cached
+        const data = await callbacks.loadEmbeddedPgs(id, signal)
+        signal.throwIfAborted()
+        if (!data?.length)
+          throw new Error('Could not read the embedded PGS track.')
+        embeddedPgs.set(id, data)
+        return data
+      },
+      onError() {
+        const { active, status } = getPlayback()
+        if (
+          active &&
+          status !== 'error' &&
+          selectedPgsId === id &&
+          selection?.captions
+        )
+          callbacks.onError('Could not render the embedded PGS track.')
+      },
+    }
+  }
+
+  async function selectSubtitle(id: number) {
+    const { player, media } = getPlayback()
+    if (!media?.subtitles.some((track) => track.id === id)) throw new Error()
+    if (player.canLoadEmbeddedPgs(id)) {
+      selectedPgsId = id
+    } else {
+      if (id !== player.getSelectedSubtitleStreamId())
+        await player.selectSubtitle(id)
+      if (id !== player.getSelectedSubtitleStreamId()) throw new Error()
+      selectedPgsId = undefined
+    }
+    syncTracks(true)
+  }
+
   function syncTracks(captions = selection?.captions ?? true) {
     const playback = getPlayback()
     if (
@@ -162,7 +213,8 @@ export function createPlaybackTracks(
 
     const { audio, subtitles } = playback.media
     const audioId = playback.player.getSelectedAudioStreamId()
-    const subtitleId = playback.player.getSelectedSubtitleStreamId()
+    const subtitleId =
+      selectedPgsId ?? playback.player.getSelectedSubtitleStreamId()
     const selectedAudio = audioSilent
       ? undefined
       : audio.find((track) => track.id === audioId)
@@ -185,6 +237,12 @@ export function createPlaybackTracks(
       selectedAudio,
       selectedSubtitle,
       captions,
+      pgsSubtitle:
+        previous?.selectedSubtitle === selectedSubtitle
+          ? previous?.pgsSubtitle
+          : selectedSubtitle && selectedPgsId === selectedSubtitle.id
+            ? pgsSource(selectedSubtitle.id)
+            : undefined,
       styledSubtitle:
         previous?.selectedSubtitle === selectedSubtitle
           ? previous?.styledSubtitle
@@ -252,6 +310,7 @@ export function createPlaybackTracks(
     },
     setVolume,
     selectAudio,
+    selectSubtitle,
     checkAudioSelection,
     setSubtitleDelay,
     subtitleClock,

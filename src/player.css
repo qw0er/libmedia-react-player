@@ -44,12 +44,19 @@
   visibility: hidden;
 }
 
-.lmp-styled-subtitles {
+.lmp-styled-subtitles,
+.lmp-pgs-subtitles {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   pointer-events: none;
+}
+
+.lmp-pgs-subtitles canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .lmp-styled-subtitles[data-visible="false"] {

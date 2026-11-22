@@ -57,14 +57,15 @@ Anishelf acceptance checks.
       overlapping cues, and an in-cue WebVTT seek also passed.
       [Subtitle inputs](../README.md#subtitles)
 
-- [ ] **Decide how to handle Matroska PGS.** The tested bitmap fixture produced
-      no selectable subtitle output. **Fix.** Decide whether PGS is required for
-      the default switch. If required, implement bitmap rendering or provide a
-      verified playback path that supports it. If deferred, document the
-      limitation and the available fallback in Anishelf. **Verify.** For a
-      supported path, select a real PGS track, verify display and timing after
-      seeks, and check that disabling captions clears the bitmap.
-      [Known subtitle limitations](../README.md#subtitles)
+- [x] **Render embedded Matroska PGS on demand.** The fork reads the selected
+      track on a separate demux cursor. libbitsub draws bitmaps from the player
+      clock and reuses subtitle data within the playback session.
+      **Verified in Chrome.** An authenticated MKV with two PGS tracks rendered
+      the correct bitmap after paused seeks. Cue expiration, track switching,
+      turning captions off, cancellation, and a PGS-only file also passed.
+      A standalone Electron ASAR using Anishelf's production protocol and CSP
+      loaded the npm package and rendered PGS.
+      [Subtitle inputs](../README.md#subtitles)
 
 ## Anishelf integration and release
 

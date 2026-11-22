@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { PgsSubtitles } from './components/PgsSubtitles'
 import { CenterControls } from './components/PlaybackButtons'
 import { PlayerControls } from './components/PlayerControls'
 import { PlayerPanel } from './components/PlayerPanel'
@@ -141,6 +142,7 @@ function Playback({
     selectedSubtitle,
     styledSubtitle,
     styledSubtitleStatus,
+    pgsSubtitle,
   } = playback
   const root = useRef<HTMLElement>(null)
   const panelTrigger = useRef<HTMLButtonElement | null>(null)
@@ -244,7 +246,9 @@ function Playback({
           setPanelOpen(false)
         }
       }}
-      data-captions={captions && styledSubtitleStatus !== 'styled'}
+      data-captions={
+        captions && !pgsSubtitle && styledSubtitleStatus !== 'styled'
+      }
       data-status={status}
       onPointerDown={(event) => {
         pointerType.current = event.pointerType
@@ -292,6 +296,13 @@ function Playback({
         {styles}
       </style>
       <div className="lmp-viewport" ref={playback.viewport} />
+      {pgsSubtitle && captions && selectedSubtitle && status !== 'error' && (
+        <PgsSubtitles
+          key={selectedSubtitle.id}
+          track={pgsSubtitle}
+          clock={playback.subtitleClock}
+        />
+      )}
       {styledSubtitle &&
         styledSubtitleStatus !== 'fallback' &&
         selectedSubtitle &&

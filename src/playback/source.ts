@@ -133,7 +133,8 @@ export function readMedia(player: BundledPlayer, supportedCodecs: number[]) {
       streams.filter(
         (stream) =>
           stream.mediaType === 'Subtitle' &&
-          supportedCodecs.includes(stream.codecparProxy.codecId),
+          (supportedCodecs.includes(stream.codecparProxy.codecId) ||
+            player.canLoadEmbeddedPgs(stream.id)),
       ),
       'Subtitle',
     ),

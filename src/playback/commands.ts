@@ -151,16 +151,8 @@ export function createPlaybackCommands(
   return {
     controls,
     selectSubtitle(id: number) {
-      return run(
-        'track',
-        'Could not switch subtitle tracks.',
-        async (current) => {
-          const { player } = current
-          if (id !== player.getSelectedSubtitleStreamId())
-            await player.selectSubtitle(id)
-          if (id !== player.getSelectedSubtitleStreamId()) throw new Error()
-          current.tracks.syncTracks(true)
-        },
+      return run('track', 'Could not switch subtitle tracks.', (current) =>
+        current.tracks.selectSubtitle(id),
       )
     },
     subtitleClock: () => session.current?.tracks.subtitleClock(),

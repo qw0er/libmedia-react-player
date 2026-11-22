@@ -137,6 +137,11 @@ export function startPlaybackSession(
           http: source.mediaRequest,
           signal: AbortSignal.any([signal, trackSignal]),
         }),
+      loadEmbeddedPgs: (id, trackSignal) =>
+        player.loadEmbeddedPgs(id, {
+          http: source.mediaRequest,
+          signal: AbortSignal.any([signal, trackSignal]),
+        }),
       setTracks: callbacks.setTracks,
       setVolume: callbacks.setVolume,
       setDelay: callbacks.setDelay,

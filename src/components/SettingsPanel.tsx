@@ -75,11 +75,11 @@ export function SettingsHome({
           onPage={onPage}
         />
       )}
-      {selectedSubtitle && (
+      {media.subtitles.length > 0 && playback.status !== 'ready' && (
         <SettingLink
           icon={Captions}
           label={labels.subtitles}
-          value={captions ? selectedSubtitle.label : labels.off}
+          value={(captions && selectedSubtitle?.label) || labels.off}
           page="subtitles"
           onPage={onPage}
         />
@@ -154,7 +154,7 @@ export function TrackList({
       {kind === 'subtitles' && (
         <TrackChoice
           label={labels.off}
-          selected={!captions}
+          selected={!captions || !selectedSubtitle}
           onSelect={() => playback.changeCaptions(false)}
         />
       )}

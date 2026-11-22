@@ -41,6 +41,8 @@ These examples cover containers recognized by the bundled engine and decoders sh
 
 Selecting an embedded ASS/SSA track in an MKV loads its script and attached fonts automatically. Native captions remain available until JASSUB draws its first frame. The first selection of each track scans the MKV through a separate reader using the same `mediaRequest` settings. The script and fonts are cached for that playback session.
 
+Embedded PGS tracks in an MKV are selectable in **Settings → Subtitles**. The player reads the track when selected and caches its subtitle data for the playback session. libbitsub draws the bitmaps over the video, using the player's clock and subtitle delay.
+
 For external ASS/SSA, use `renderer: 'styled'` to load JASSUB when the viewer selects the track.
 
 ```tsx
@@ -60,7 +62,6 @@ For external ASS/SSA, use `renderer: 'styled'` to load JASSUB when the viewer se
 
 - `offsetMs` adjusts one sidecar. Positive values delay its cues. The viewer's subtitle delay is added to that offset.
 - While embedded ASS resources load, the native renderer may miss a cue already active at the resume position.
-- The tested Matroska PGS bitmap track was unavailable in the subtitle menu.
 
 ## Authenticated media
 
