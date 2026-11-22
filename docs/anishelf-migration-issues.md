@@ -32,12 +32,14 @@ Anishelf acceptance checks.
 - [ ] **Verify same-origin runtime delivery in packaged Anishelf.** The former
       AVPlayer blob entry and audio worklet scripts failed under the Anishelf CSP.
       The fork now emits AVPlayer and the two AudioWorklet modules as same-origin
+      files. The styled renderer also loads the JASSUB JS modules as same-origin
       files. The Vite consumer build includes these assets under flat `assets/`
       filenames. **Verify.** Install a production Anishelf package and test
       authenticated HEVC playback and seeks, plus native and styled subtitles,
-      through `anishelf://desktop`. Chrome with the equivalent policy covered
-      direct-HTTP playback and seek regressions. JASSUB still imports a blob module
-      inside its Worker and requires the policy described in the README.
+      through `anishelf://desktop`. A production Vite consumer in Chrome passed
+      authenticated HEVC playback, seeking, and styled subtitle rendering under
+      the equivalent policy. The subtitle checks covered both JASSUB builds and
+      the modern build's pthread workers.
       [Runtime loader](../src/bundledPlayer.ts) · [Deployment requirements](../README.md#runtime-and-deployment)
 
 - [ ] **Keep manual playback available after blocked autoplay.** The current

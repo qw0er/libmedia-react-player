@@ -137,7 +137,7 @@ See [TypeScript definitions](src/player-api.ts) for full signatures.
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Basic playback                | React 19, WebAssembly SIMD, and a browser-accessible media URL                                                                                                                                                              |
 | Software playback             | WebGL and Web Audio                                                                                                                                                                                                         |
-| Styled subtitles              | Workers and OffscreenCanvas. Workers and assets are emitted by the app build. Styled subtitles also require `blob:` in `script-src` for the JASSUB Worker                                                                   |
+| Styled subtitles              | Workers and OffscreenCanvas. Serve the JASSUB Worker and its JS modules as same-origin assets from the app build.                                                                                                           |
 | Content Security Policy (CSP) | Allow same-origin scripts and `'wasm-unsafe-eval'` in `script-src`, and `blob:` in `worker-src`. Allow the media origin in `connect-src`, `blob:` in `media-src` for MSE, and `data:` in `connect-src` for styled subtitles |
 
 For multithreaded WASM, serve the page with these headers and permit cross-origin resources through CORS or CORP as applicable. Check `window.crossOriginIsolated` to confirm.
@@ -172,4 +172,3 @@ so package consumers can install it without checking out the submodule.
 
 - Project code — [LGPL-3.0-or-later](LICENSE)
 - Bundled AVPlayer and SIMD decoders — [libmedia fork pinned in `deps/libmedia`](https://github.com/qw0er/libmedia)
-- Bundled JASSUB — upstream license in `dist/JASSUB-LICENSE`
