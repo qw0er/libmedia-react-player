@@ -83,23 +83,29 @@ Use `sourceFormat` when the URL has no file extension. The player applies `media
 
 ### Props
 
-| Prop                | Purpose                                                                   |
-| ------------------- | ------------------------------------------------------------------------- |
-| `src`               | Required media URL                                                        |
-| `sourceFormat`      | Extension hint such as `mp4`, `mkv`, or `webm`                            |
-| `mediaRequest`      | Optional fetch headers and credentials mode                               |
-| `externalSubtitles` | Subtitle tracks supplied by the host                                      |
-| `initialPositionMs` | Resume position applied when the source loads                             |
-| `initialAudio`      | File stream index. Pass `null` for silence or omit for the engine default |
-| `labels`            | Override control text and accessible names, including `nextEpisode`       |
-| `className`         | Additional CSS class on the player root                                   |
-| `style`             | Inline CSS styles on the player root                                      |
-| `onNextEpisode`     | Shows the next-episode button and calls the host when pressed             |
-| `ref`               | `Ref<LibmediaPlayerHandle>` for playback commands                         |
+| Prop                | Purpose                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `src`               | Required media URL                                                                 |
+| `sourceFormat`      | Extension hint such as `mp4`, `mkv`, or `webm`                                     |
+| `mediaRequest`      | Optional fetch headers and credentials mode                                        |
+| `externalSubtitles` | Subtitle tracks supplied by the host                                               |
+| `initialPositionMs` | Resume position applied when the source loads                                      |
+| `initialAudio`      | File stream index. Pass `null` for silence or omit for the engine default          |
+| `labels`            | Override control text and accessible names, including `nextEpisode`                |
+| `className`         | Additional CSS class on the player root                                            |
+| `style`             | Inline CSS styles on the player root                                               |
+| `onNextEpisode`     | Shows the next-episode button; pauses and exits fullscreen before calling the host |
+| `ref`               | `Ref<LibmediaPlayerHandle>` for playback commands                                  |
 
 The player defaults to full container width and a 16:9 ratio. Use `className`
 for responsive layout or `style` for a local override. Fullscreen fills the
 screen and restores the host layout on exit.
+
+The host owns the next-episode chooser. Activating the button pauses playback
+and, when the document is fullscreen, exits fullscreen before `onNextEpisode`
+runs, so a chooser portaled to `body` is visible. Playback stays paused until
+the host resumes it. A chosen episode starts windowed; the player does not keep
+fullscreen or continue playback across episodes.
 
 ```tsx
 ;<LibmediaPlayer src={url} style={{ aspectRatio: '4 / 3' }} />

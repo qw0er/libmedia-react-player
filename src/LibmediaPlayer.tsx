@@ -224,6 +224,31 @@ function Playback({
     }
   }
 
+  const nextEpisodePending = useRef(false)
+
+  async function openNextEpisode() {
+    if (!onNextEpisode || nextEpisodePending.current) return
+    nextEpisodePending.current = true
+    setFullscreenError('')
+    // Exit synchronously so the host chooser is outside fullscreen by the time
+    // it opens, then pause before reporting the activation.
+    const exited = document.fullscreenElement
+      ? document.exitFullscreen().catch(() => {
+          if (document.fullscreenElement)
+            setFullscreenError('Could not exit fullscreen.')
+        })
+      : undefined
+    const paused = controls.pause().catch(() => {})
+    try {
+      await Promise.all([exited, paused])
+      onNextEpisode()
+    } catch {
+      // The host owns navigation errors; keep the player usable.
+    } finally {
+      nextEpisodePending.current = false
+    }
+  }
+
   function play() {
     if (playing && media?.live) return
     revealControls()
@@ -379,7 +404,7 @@ function Playback({
             panelId={panelId}
             fullscreen={fullscreen}
             onPlay={play}
-            onNextEpisode={onNextEpisode}
+            onNextEpisode={onNextEpisode ? openNextEpisode : undefined}
             onScrub={setScrub}
             onFullscreen={toggleFullscreen}
             onPanel={handlePanel}

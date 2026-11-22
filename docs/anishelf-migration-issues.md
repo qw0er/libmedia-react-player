@@ -101,19 +101,20 @@ Anishelf acceptance checks.
       Worker request as unauthenticated.**
       [Authenticated media](../README.md#authenticated-media) · [Error reasons](../README.md#errors-and-recovery)
 
-- [ ] **Make the next-episode chooser work in fullscreen.** The standalone
-      test confirmed the callback at 390 px. In the Anishelf integration, the
-      current version chooser defaults to a portal in `body`, outside the
-      player's fullscreen element. A source change also replaces the current
-      fullscreen element. **Fix.** Give the host dialog a mount point in a stable
-      fullscreen container, or explicitly leave fullscreen before opening the
-      chooser. Define the fullscreen behavior on episode changes and confirm the
-      chosen container survives when fullscreen is meant to be retained.
-      **Verify.** Check zero, one, and multiple playable versions, including
-      keyboard and touch selection at narrow width. Confirm that selecting a
-      version opens the intended episode and that cancelling leaves playback
-      usable.
-      [Source key](../src/LibmediaPlayer.tsx#L85) · [Fullscreen control](../src/LibmediaPlayer.tsx#L215)
+- [x] **Make the next-episode chooser work in fullscreen.** The standalone
+      test confirmed the callback at 390 px. The Anishelf chooser stays portaled
+      outside the player, so activating Next episode now pauses playback, exits
+      document fullscreen, and only then calls the host. The chooser is visible,
+      playback stays paused until the host resumes it, and a selected episode
+      starts windowed. Fullscreen retention and continuous playback are out of
+      scope, so the player root can keep being replaced on source changes.
+      **Verified in Chrome 157.** A mock chooser confirmed that fullscreen exits
+      before the callback, playback settles on paused, and Play resumes from the
+      same position. Windowed activation pauses without touching fullscreen,
+      repeated clicks wait for one exit, and a rejected `exitFullscreen` still
+      reports the activation with a notice. Anishelf's own chooser and narrow
+      touch selection remain part of acceptance.
+      [Next episode](../src/LibmediaPlayer.tsx#L229) · [Fullscreen control](../src/LibmediaPlayer.tsx#L217)
 
 - [ ] **Integrate progress, completion, and audio with the real backend.**
       The player fixture exercised resume, seeks, audio stream switching, and
