@@ -2,6 +2,7 @@ import { ChevronLeft, SkipBack, SkipForward, X } from 'lucide-react'
 import { useLayoutEffect, useRef } from 'react'
 import type { MediaInfo, PlaybackState } from '../usePlayback'
 import { ChapterList } from './ChapterList'
+import { MediaInfoPanel } from './MediaInfoPanel'
 import { type PanelPage, usePlayerLabels } from './player-ui'
 import {
   SettingsHome,
@@ -158,6 +159,9 @@ export function PlayerPanel({
               rate={playback.rate}
               changeRate={playback.changeRate}
             />
+          )}
+          {open && page === 'mediaInfo' && (
+            <MediaInfoPanel playback={playback} media={media} />
           )}
         </div>
         {page === 'subtitles' && (

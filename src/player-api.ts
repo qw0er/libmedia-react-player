@@ -214,6 +214,23 @@ export interface LibmediaControlLabels {
   live: string
   subtitles: string
   settings: string
+  mediaInfo?: string
+  container?: string
+  duration?: string
+  videoCodec?: string
+  resolution?: string
+  frameRate?: string
+  bitDepth?: string
+  videoBitRate?: string
+  videoDecoder?: string
+  sampleRate?: string
+  channels?: string
+  waitingForPlayback?: string
+  unavailable?: string
+  mseDecoder?: string
+  wasmDecoder?: string
+  webCodecsPreferHardware?: string
+  webCodecsPreferSoftware?: string
   fullscreen: string
   exitFullscreen: string
   audio: string

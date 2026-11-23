@@ -8,6 +8,7 @@ const media: MediaInfo = {
   subtitles: [],
   chapters: [],
   videoAspectRatio: undefined,
+  videoDetails: undefined,
 }
 
 describe('seekTarget', () => {

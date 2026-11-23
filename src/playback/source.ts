@@ -5,6 +5,7 @@ import type {
   LibmediaRequestOptions,
 } from '../player-api'
 import { bitmapSidecarFormat } from './bitmap-subtitles'
+import { readVideoDetails } from './media-details'
 
 type Stream = ReturnType<BundledPlayer['getStreams']>[number]
 type TrackStream = Pick<Stream, 'id' | 'index' | 'metadata'>
@@ -139,6 +140,7 @@ export function readMedia(
     duration: Number(player.getDuration()),
     live: player.isLive(),
     chapters,
+    videoDetails: readVideoDetails(streams, -1, true),
     videoAspectRatio:
       video?.width && video.height ? video.width / video.height : undefined,
     audio: readTracks(

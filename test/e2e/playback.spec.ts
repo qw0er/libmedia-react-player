@@ -115,6 +115,45 @@ test('keeps shortcuts active after clicks in the player without a focus outline'
   await expect(player).toHaveAttribute('data-status', 'paused')
 })
 
+test('shows media parameters and the active video decoder', async ({
+  page,
+}) => {
+  await page.goto('/test/e2e/')
+  const player = page.getByRole('region', { name: 'Video player' })
+  await expect(player).toHaveAttribute('data-status', 'ready')
+
+  async function openMediaInfo() {
+    await player.getByRole('button', { name: 'Settings', exact: true }).click()
+    await player.getByRole('button', { name: /Media info/ }).click()
+    return player.getByRole('region', { name: 'Media info' })
+  }
+
+  const info = await openMediaInfo()
+  await expect(info.getByText('Matroska', { exact: true })).toBeVisible()
+  await expect(info.getByText(/H\.264 \/ AVC/)).toBeVisible()
+  await expect(info.getByText('160 × 90', { exact: true })).toBeVisible()
+  await expect(info.getByText('10 fps', { exact: true })).toBeVisible()
+  await expect(info.getByText('8-bit', { exact: true })).toBeVisible()
+  await expect(info.getByText('Waiting for playback')).toBeVisible()
+  await info.getByRole('button', { name: 'Back to settings' }).click()
+  await expect(player.getByRole('button', { name: /Media info/ })).toBeFocused()
+  await player
+    .getByRole('region', { name: 'Settings', exact: true })
+    .getByRole('button', { name: 'Close menu', exact: true })
+    .click()
+
+  await player.locator('.lmp-center').click()
+  await expect(player).toHaveAttribute('data-status', 'playing')
+  await openMediaInfo()
+  await expect(
+    info.getByText(
+      /^(Browser \(MSE\)|WASM \(software\)|WebCodecs \(prefer (hardware|software)\))$/,
+    ),
+  ).toBeVisible()
+  await expect(info.getByText('48000 Hz', { exact: true })).toBeVisible()
+  await expect(info.getByText(/AAC/)).toBeVisible()
+})
+
 test.describe('touch controls', () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } })
 

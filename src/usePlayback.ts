@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react'
 import { createPlaybackCommands } from './playback/commands'
+import { readMediaDetails } from './playback/media-details'
 import {
   createPlaybackSessionId,
   type PlaybackSession,
@@ -179,6 +180,22 @@ export function usePlayback(
   )
 
   const getSnapshot = useCallback(() => snapshot.current, [])
+  const getMediaDetails = useCallback(
+    async (audioId: number | undefined, subtitleId: number | undefined) => {
+      const current = session.current
+      if (!current?.active) return
+      const { player, status } = current
+      const details = readMediaDetails(
+        player,
+        status === 'ready' || status === 'starting',
+        audioId,
+        subtitleId,
+      )
+      const decoder = await player.getVideoDecodeInfo().catch(() => null)
+      if (current.active) return { ...details, decoder }
+    },
+    [],
+  )
 
   const commands = useMemo(
     () =>
@@ -196,6 +213,7 @@ export function usePlayback(
     controls,
     retry,
     getSnapshot,
+    getMediaDetails,
     status,
     media,
     buffered,

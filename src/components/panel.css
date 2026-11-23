@@ -116,6 +116,25 @@
   scrollbar-color: #555c68 transparent;
 }
 
+.lmp-media-info {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 10px 14px;
+  margin: 0;
+  padding: 10px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.lmp-media-info dt {
+  color: var(--lmp-muted);
+}
+
+.lmp-media-info dd {
+  margin: 0;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .lmp-panel,
   .libmedia-player .lmp-scrim {

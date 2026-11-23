@@ -3,7 +3,7 @@ import type { LibmediaControlLabels } from '../player-api'
 
 export const seekStepMs = 5000
 
-export const defaultLabels: LibmediaControlLabels = {
+export const defaultLabels: Required<LibmediaControlLabels> = {
   player: 'Video player',
   play: 'Play',
   pause: 'Pause',
@@ -18,6 +18,23 @@ export const defaultLabels: LibmediaControlLabels = {
   live: 'Live',
   subtitles: 'Subtitles',
   settings: 'Settings',
+  mediaInfo: 'Media info',
+  container: 'Container',
+  duration: 'Duration',
+  videoCodec: 'Video codec',
+  resolution: 'Resolution',
+  frameRate: 'Frame rate',
+  bitDepth: 'Bit depth',
+  videoBitRate: 'Video bit rate',
+  videoDecoder: 'Video decoder',
+  sampleRate: 'Sample rate',
+  channels: 'Channels',
+  waitingForPlayback: 'Waiting for playback',
+  unavailable: 'Unavailable',
+  mseDecoder: 'Browser (MSE)',
+  wasmDecoder: 'WASM (software)',
+  webCodecsPreferHardware: 'WebCodecs (prefer hardware)',
+  webCodecsPreferSoftware: 'WebCodecs (prefer software)',
   fullscreen: 'Fullscreen',
   exitFullscreen: 'Exit fullscreen',
   audio: 'Audio',
@@ -53,3 +70,4 @@ export type PanelPage =
   | 'audio'
   | 'subtitles'
   | 'speed'
+  | 'mediaInfo'

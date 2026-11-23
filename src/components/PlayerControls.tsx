@@ -143,21 +143,17 @@ export function PlayerControls({
               <Captions aria-hidden="true" />
             </button>
           )}
-          {(!live ||
-            (media.audio.length > 0 && status !== 'ready') ||
-            selectedSubtitle) && (
-            <button
-              className="lmp-button"
-              type="button"
-              aria-label={labels.settings}
-              title={labels.settings}
-              aria-expanded={settingsOpen}
-              aria-controls={panelId}
-              onClick={(event) => onPanel('settings', event.currentTarget)}
-            >
-              <Settings aria-hidden="true" />
-            </button>
-          )}
+          <button
+            className="lmp-button"
+            type="button"
+            aria-label={labels.settings}
+            title={labels.settings}
+            aria-expanded={settingsOpen}
+            aria-controls={panelId}
+            onClick={(event) => onPanel('settings', event.currentTarget)}
+          >
+            <Settings aria-hidden="true" />
+          </button>
         </div>
         <button
           className="lmp-button"

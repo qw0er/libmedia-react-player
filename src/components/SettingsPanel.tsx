@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Gauge,
   Headphones,
+  Info,
   type LucideIcon,
   Minus,
   Plus,
@@ -93,6 +94,15 @@ export function SettingsHome({
           onPage={onPage}
         />
       )}
+      <SettingLink
+        icon={Info}
+        label={labels.mediaInfo}
+        value={[media.videoDetails?.codec, media.videoDetails?.resolution]
+          .filter(Boolean)
+          .join(' · ')}
+        page="mediaInfo"
+        onPage={onPage}
+      />
       {media.audio.length > 0 && (
         <div className="lmp-touch-volume">
           <Volume2 className="lmp-setting-icon" aria-hidden="true" />
