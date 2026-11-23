@@ -296,13 +296,6 @@
   background: rgb(255 255 255 / 13%);
 }
 
-.libmedia-player .lmp-next-episode {
-  gap: 6px;
-  width: auto;
-  padding-inline: 10px;
-  white-space: nowrap;
-}
-
 .lmp-cc[aria-pressed="true"] {
   position: relative;
   color: var(--lmp-accent);
@@ -537,15 +530,6 @@
 
   .libmedia-player
     :is(.lmp-transport:not(:has(+ .lmp-next-episode)), .lmp-volume) {
-    display: none;
-  }
-
-  .libmedia-player .lmp-next-episode {
-    width: 44px;
-    padding-inline: 0;
-  }
-
-  .lmp-next-episode span {
     display: none;
   }
 

@@ -90,7 +90,6 @@ export function PlayerControls({
             onClick={() => onNextEpisode()}
           >
             <SkipForward aria-hidden="true" />
-            <span>{labels.nextEpisode}</span>
           </button>
         )}
         {media.audio.length > 0 && (
