@@ -168,6 +168,8 @@ function Playback({
   const panelTrigger = useRef<HTMLButtonElement | null>(null)
   const panelId = useId()
   const pointerType = useRef('')
+  const shortcut =
+    useRef<(event: KeyboardEvent, byPointer: boolean) => void>(null)
   const hideTimer = useRef<number>(undefined)
   const [idle, setIdle] = useState(false)
   const [page, setPage] = useState<PanelPage>('settings')
@@ -303,6 +305,87 @@ function Playback({
     playback.togglePlay()
   }
 
+  useLayoutEffect(() => {
+    shortcut.current = (event, byPointer) => {
+      if (event.defaultPrevented || event.isComposing) return
+      if (event.key === 'Escape' && (panelOpen || pageFullscreen)) {
+        event.preventDefault()
+        event.stopPropagation()
+        if (panelOpen) closePanel()
+        else setPageFullscreen(false)
+        return
+      }
+
+      const target = event.composedPath()[0]
+      if (
+        !loaded ||
+        status === 'starting' ||
+        panelOpen ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        (!byPointer && target !== root.current && target !== stage.current) ||
+        (target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            target.matches('input:not([type="range"]), select, textarea')))
+      )
+        return
+
+      if (event.key === ' ' || event.key === 'k') play()
+      else if (event.key === 'ArrowLeft') playback.seek(time - seekStepMs)
+      else if (event.key === 'ArrowRight') playback.seek(time + seekStepMs)
+      else if (event.key === 'm') playback.toggleMute()
+      else if (event.key === 'c' && selectedSubtitle)
+        playback.changeCaptions(!captions)
+      else if (event.key === 'f') void toggleFullscreen()
+      else return
+      event.preventDefault()
+      event.stopPropagation()
+      revealControls()
+    }
+  })
+
+  useEffect(() => {
+    const player = root.current
+    if (!player) return
+    const { ownerDocument } = player
+    const isInside = (event: Event) => event.composedPath().includes(player)
+    let activation: 'pointer' | 'keyboard' | undefined
+
+    function onPointerDown(event: PointerEvent) {
+      activation = isInside(event) ? 'pointer' : undefined
+    }
+
+    function onFocusIn(event: FocusEvent) {
+      if (isInside(event)) {
+        activation ??= 'keyboard'
+      } else if (event.target !== ownerDocument.body) {
+        activation = undefined
+      }
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (!activation) return
+      if (event.key === 'Tab') {
+        activation = 'keyboard'
+        return
+      }
+      if (activation === 'pointer' || isInside(event)) {
+        shortcut.current?.(event, activation === 'pointer')
+      }
+    }
+
+    // Handle shortcuts before a clicked control can apply its own key behavior.
+    ownerDocument.addEventListener('pointerdown', onPointerDown, true)
+    ownerDocument.addEventListener('focusin', onFocusIn, true)
+    ownerDocument.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      ownerDocument.removeEventListener('pointerdown', onPointerDown, true)
+      ownerDocument.removeEventListener('focusin', onFocusIn, true)
+      ownerDocument.removeEventListener('keydown', onKeyDown, true)
+    }
+  }, [])
+
   return (
     <section
       ref={root}
@@ -342,35 +425,6 @@ function Playback({
       }}
       onPointerMove={(event) => {
         if (event.pointerType === 'mouse') revealControls()
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && (panelOpen || pageFullscreen)) {
-          event.preventDefault()
-          event.stopPropagation()
-          if (panelOpen) closePanel()
-          else setPageFullscreen(false)
-          return
-        }
-        if (
-          (event.target !== event.currentTarget &&
-            event.target !== stage.current) ||
-          !loaded ||
-          status === 'starting' ||
-          event.altKey ||
-          event.ctrlKey ||
-          event.metaKey
-        )
-          return
-        if (event.key === ' ' || event.key === 'k') play()
-        else if (event.key === 'ArrowLeft') playback.seek(time - seekStepMs)
-        else if (event.key === 'ArrowRight') playback.seek(time + seekStepMs)
-        else if (event.key === 'm') playback.toggleMute()
-        else if (event.key === 'c' && selectedSubtitle)
-          playback.changeCaptions(!captions)
-        else if (event.key === 'f') void toggleFullscreen()
-        else return
-        revealControls()
-        event.preventDefault()
       }}
     >
       <style href="libmedia-react-player" precedence="default">

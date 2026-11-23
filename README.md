@@ -18,7 +18,7 @@ export default function App() {
 
 - **Chapters** — Open the time display when it shows a chevron.
 - **Subtitles** — Use **CC** to toggle captions. Select tracks and adjust subtitle delay in **Settings**.
-- **Keyboard** — Focus the player. **Space** or **K** plays or pauses, **← / →** seeks five seconds, **M** mutes, **C** toggles captions, **F** toggles fullscreen, and **Esc** closes an open menu or exits page fullscreen.
+- **Keyboard** — Click anywhere in the player or tab to it. **Space** or **K** plays or pauses, **← / →** seeks five seconds, **M** mutes, **C** toggles captions, **F** toggles fullscreen, and **Esc** closes an open menu or exits page fullscreen. Click outside the player to release its shortcuts.
 
 ## Formats and decoding
 

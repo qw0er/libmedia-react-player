@@ -17,11 +17,12 @@ function playbackState(page: Page) {
 
 async function expectSeek(page: Page, targetMs: number) {
   await expect
-    .poll(() => readOutput<LibmediaSeekEvent>(page, 'seek'))
-    .toBeDefined()
+    .poll(async () => {
+      const seek = await readOutput<LibmediaSeekEvent>(page, 'seek')
+      return Math.abs((seek?.requestedPositionMs ?? Infinity) - targetMs)
+    })
+    .toBeLessThan(200)
   const seek = await readOutput<LibmediaSeekEvent>(page, 'seek')
-  expect(seek?.requestedPositionMs).toBeGreaterThan(targetMs - 200)
-  expect(seek?.requestedPositionMs).toBeLessThan(targetMs + 200)
   expect(seek?.positionMs).toBeGreaterThanOrEqual(targetMs - 1000)
   expect(seek?.positionMs).toBeLessThan(targetMs + 1000)
 }
@@ -69,6 +70,49 @@ test('plays protected Matroska and seeks when the timeline is clicked', async ({
   await timeline.click(await timelinePosition(page, 7000))
   await expectSeek(page, 7000)
   await expect(page.getByTestId('errors')).toHaveText('[]')
+})
+
+test('keeps shortcuts active after clicks in the player without a focus outline', async ({
+  page,
+}) => {
+  await page.goto('/test/e2e/')
+  const player = page.getByRole('region', { name: 'Video player' })
+  await expect(player).toHaveAttribute('data-status', 'ready')
+  await page.keyboard.press('Tab')
+  await expect(player).toBeFocused()
+  await expect(player).toHaveCSS('outline-style', 'none')
+
+  await player.locator('.lmp-center').click()
+  await expect(player).toHaveAttribute('data-status', 'playing')
+  await page.keyboard.press('Space')
+  await expect(player).toHaveAttribute('data-status', 'paused')
+
+  await player.getByRole('button', { name: 'Mute', exact: true }).click()
+  const unmute = player.getByRole('button', { name: 'Unmute', exact: true })
+  await expect(unmute).toBeFocused()
+  await page.keyboard.press('Space')
+  await expect(player).toHaveAttribute('data-status', 'playing')
+  await expect(unmute).toHaveCSS('outline-style', 'none')
+
+  const surface = player.locator('.lmp-surface')
+  await surface.click({ position: { x: 120, y: 120 } })
+  await expect(player).toHaveAttribute('data-status', 'paused')
+  await expect(surface).toBeFocused()
+  await page.keyboard.press('k')
+  await expect(player).toHaveAttribute('data-status', 'playing')
+  await expect(surface).toHaveCSS('outline-style', 'none')
+  await page.keyboard.press('Space')
+  await expect(player).toHaveAttribute('data-status', 'paused')
+
+  const timeline = player.locator('.lmp-timeline')
+  await timeline.click(await timelinePosition(page, 2000))
+  await expectSeek(page, 2000)
+  await page.keyboard.press('ArrowRight')
+  await expectSeek(page, 7000)
+
+  await page.getByTestId('state').click()
+  await page.keyboard.press('Space')
+  await expect(player).toHaveAttribute('data-status', 'paused')
 })
 
 test.describe('touch controls', () => {

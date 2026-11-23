@@ -110,10 +110,9 @@
   cursor: default;
 }
 
-.libmedia-player:focus-visible,
-.libmedia-player :is(button, input, .lmp-panel, .lmp-stage):focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: -2px;
+.libmedia-player:focus,
+.libmedia-player :is(button, input, .lmp-panel, .lmp-stage):focus {
+  outline: none;
 }
 
 .lmp-center-controls {
@@ -243,21 +242,26 @@
   transition: opacity 150ms ease;
 }
 
-.libmedia-player[data-visible="false"]:not(:focus-visible, :has(:focus-visible))
+.libmedia-player[data-visible="false"]:not(
+    :has(:is(.lmp-controls, .lmp-center-controls) :focus-visible)
+  )
   :is(.lmp-controls, .lmp-center-controls) {
   opacity: 0;
 }
 
-.libmedia-player[data-visible="false"]:not(:focus-visible, :has(:focus-visible))
+.libmedia-player[data-visible="false"]:not(
+    :has(:is(.lmp-controls, .lmp-center-controls) :focus-visible)
+  )
   :is(.lmp-controls, .lmp-center-controls button) {
   pointer-events: none;
 }
 
 .libmedia-player[data-visible="false"]:not(
-  :focus-visible,
-  :has(:focus-visible)
+  :has(:is(.lmp-controls, .lmp-center-controls) :focus-visible)
 ),
-.libmedia-player[data-visible="false"]:not(:focus-visible, :has(:focus-visible))
+.libmedia-player[data-visible="false"]:not(
+    :has(:is(.lmp-controls, .lmp-center-controls) :focus-visible)
+  )
   .lmp-surface {
   cursor: none;
 }
@@ -515,8 +519,7 @@
 
   .libmedia-player:is(
       [data-visible="true"],
-      :focus-visible,
-      :has(:focus-visible)
+      :has(:is(.lmp-controls, .lmp-center-controls) :focus-visible)
     )
     :is(.lmp-row, .lmp-options, .lmp-timeline) {
     pointer-events: auto;

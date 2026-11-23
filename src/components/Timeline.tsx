@@ -23,7 +23,6 @@ export function Timeline({
   onSeek,
 }: TimelineProps) {
   const labels = usePlayerLabels()
-  const slider = useRef<HTMLInputElement>(null)
   const activePointer = useRef<number | null>(null)
   const [hover, setHover] = useState<number>()
   const starts = [
@@ -69,9 +68,7 @@ export function Timeline({
       onPointerDown={(event) => {
         if (event.button !== 0 || activePointer.current !== null) return
         event.preventDefault()
-        if (event.pointerType === 'mouse') {
-          slider.current?.focus({ preventScroll: true })
-        } else setHover(undefined)
+        if (event.pointerType !== 'mouse') setHover(undefined)
         activePointer.current = event.pointerId
         event.currentTarget.setPointerCapture(event.pointerId)
         onScrub(pointerTime(event))
@@ -143,7 +140,6 @@ export function Timeline({
       </div>
       <span className="lmp-thumb" aria-hidden="true" />
       <input
-        ref={slider}
         aria-label={labels.seek}
         aria-valuetext={`${clock(time)} of ${clock(duration)}`}
         type="range"
