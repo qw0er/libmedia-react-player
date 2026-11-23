@@ -299,7 +299,7 @@ npm run dev
 | Command                  | Purpose                                                                                  |
 | ------------------------ | ---------------------------------------------------------------------------------------- |
 | `npm run build:libmedia` | Rebuild the AVPlayer runtime, audio worklets, and declarations from the checked-out fork |
-| `npm run check`          | Run Biome, TypeScript, and both test suites                                              |
+| `npm run check`          | Run Biome, TypeScript, and the Vitest suite                                              |
 | `npm run build`          | Build the library and declarations into `dist/`                                          |
 
 The submodule pins the source of both the browser runtime and TypeScript declarations.
@@ -309,17 +309,20 @@ so package consumers can install it without checking out the submodule.
 
 ### Tests
 
-| Command             | Coverage                                                                   |
-| ------------------- | -------------------------------------------------------------------------- |
-| `npm test`          | Run both suites                                                            |
-| `npm run test:unit` | Run Vitest for seek bounds, error classification, and session cancellation |
-| `npm run test:e2e`  | Build the library and run Playwright in Google Chrome                      |
+| Command             | Coverage                                                               |
+| ------------------- | ---------------------------------------------------------------------- |
+| `npm test`          | Run unit and React Testing Library component tests in Vitest           |
+| `npm run test:unit` | Run the same Vitest suite directly                                     |
+| `npm run test:e2e`  | Build the library and run Playwright in Google Chrome with two workers |
 
-Run the development setup above first. The browser suite requires Google Chrome
-and starts a local Vite server on an available port. It imports the built library through
-its public package entry point and serves a synthetic H.264/AAC Matroska fixture
-with embedded SRT subtitles behind an authenticated byte-range endpoint. It
-covers playback, mouse and touch seeking, subtitles, and recovery after HTTP 401.
+Component tests use a simulated DOM and a test playback runtime to check
+controls, focus, localization, and playback callbacks without launching Chrome.
+Run the browser suite separately after the development setup above. It starts a
+local Vite server on an available port, imports the built package through its
+public entry point, and serves a synthetic H.264/AAC Matroska fixture behind an
+authenticated byte-range endpoint. It covers real playback and decoder
+reporting, mouse and touch seeking, embedded and external SRT rendering, and
+recovery after HTTP 401. CI and release workflows run it as an explicit step.
 Failing runs retain traces in `test-results/` for `npx playwright show-trace`.
 
 The paused seek into an already-active embedded SRT cue is marked as an expected

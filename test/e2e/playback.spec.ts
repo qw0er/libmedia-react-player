@@ -1,11 +1,9 @@
 import { expect, type Page, test } from '@playwright/test'
 import type {
-  LibmediaPlaybackPreferenceChangeEvent,
   LibmediaPlaybackProgress,
   LibmediaPlaybackState,
   LibmediaPlayerError,
   LibmediaSeekEvent,
-  LibmediaTrackChangeEvent,
 } from 'libmedia-react-player'
 
 async function readOutput<T>(page: Page, name: string): Promise<T | undefined> {
@@ -16,222 +14,6 @@ async function readOutput<T>(page: Page, name: string): Promise<T | undefined> {
 function playbackState(page: Page) {
   return readOutput<LibmediaPlaybackState>(page, 'state')
 }
-
-for (const mode of ['strict', 'legacy']) {
-  test(`keeps playback silent for an unavailable ${mode} audio selection`, async ({
-    page,
-  }) => {
-    await page.goto(`/test/e2e/?audio=${mode}`)
-    await expect
-      .poll(() => readOutput<LibmediaPlayerError[]>(page, 'errors'))
-      .toMatchObject([{ operation: 'track', fatal: false }])
-    await page.locator('.lmp-center').click()
-    await expect
-      .poll(() => playbackState(page))
-      .toMatchObject({ status: 'playing' })
-    await expect
-      .poll(() => readOutput<LibmediaTrackChangeEvent>(page, 'tracks'))
-      .toMatchObject({ audio: null })
-  })
-}
-
-for (const initialPosition of ['5000', 'NaN']) {
-  test(`reports the initial seek result for ${initialPosition} in onReady`, async ({
-    page,
-  }) => {
-    const restored = initialPosition === '5000'
-    await page.goto(`/test/e2e/?initialPosition=${initialPosition}`)
-    await expect
-      .poll(() => readOutput(page, 'load-events'))
-      .toMatchObject([
-        { type: 'initialPositionResult', event: { restored } },
-        { type: 'ready', event: { initialPositionResult: { restored } } },
-      ])
-    const [legacy, ready] = JSON.parse(
-      (await page.getByTestId('load-events').textContent()) ?? '[]',
-    )
-    const {
-      requestedPositionMs,
-      restored: legacyRestored,
-      ...progress
-    } = legacy.event
-    expect(ready.event).toEqual({
-      ...progress,
-      initialPositionResult: { requestedPositionMs, restored: legacyRestored },
-    })
-    if (restored) {
-      expect(requestedPositionMs).toBe(5000)
-      expect(progress.positionMs).toBeGreaterThan(0)
-    }
-  })
-}
-
-test('switches the interface language during playback and keeps the session', async ({
-  page,
-}) => {
-  await page.goto('/test/e2e/?locale')
-  const player = page.locator('.libmedia-player')
-  const switchLanguage = page.getByRole('button', { name: 'Switch language' })
-  await expect(player).toHaveAccessibleName('Video player')
-  await expect(player).toHaveAttribute('data-status', 'ready')
-  await player.locator('.lmp-center').click()
-  await expect(player).toHaveAttribute('data-status', 'playing')
-  const sessionId = (await playbackState(page))?.sessionId
-  expect(sessionId).toBeTruthy()
-
-  await switchLanguage.click()
-  await expect(player).toHaveAttribute('lang', 'zh-CN')
-  await expect(player).toHaveAccessibleName('视频播放器')
-  await expect
-    .poll(() => playbackState(page))
-    .toMatchObject({ sessionId, status: 'playing' })
-  await player.getByRole('button', { name: '播放设置', exact: true }).click()
-  const panel = player.locator('.lmp-panel')
-  await expect(panel.getByText('音轨 1', { exact: true })).toBeVisible()
-  await expect(panel.getByText('English', { exact: true })).toBeVisible()
-
-  await page.getByRole('button', { name: 'Select missing audio' }).click()
-  await expect(player.getByRole('status')).toHaveText('无法选择指定音轨。')
-  await switchLanguage.click()
-  await expect(player.getByRole('status')).toHaveText(
-    'Could not select the requested audio stream.',
-  )
-  await expect(player).toHaveAccessibleName('Video player')
-  await expect
-    .poll(() => playbackState(page))
-    .toMatchObject({ sessionId, status: 'playing' })
-})
-
-test('localizes the playback failure overlay without retrying the media', async ({
-  page,
-}) => {
-  await page.goto('/test/e2e/?locale&expired')
-  const alert = page.getByRole('alert')
-  await expect(alert).toHaveText(
-    'Playback failed. Check the video URL and browser compatibility.',
-  )
-  const sessionId = (await playbackState(page))?.sessionId
-  expect(sessionId).toBeTruthy()
-
-  await page.getByRole('button', { name: 'Switch language' }).click()
-  await expect(alert).toHaveText('播放失败，请检查视频链接和浏览器兼容性。')
-  await expect
-    .poll(() => playbackState(page))
-    .toMatchObject({ sessionId, status: 'error' })
-  await expect
-    .poll(() => readOutput<LibmediaPlayerError[]>(page, 'errors'))
-    .toEqual([
-      expect.objectContaining({
-        sessionId,
-        operation: 'load',
-        reason: 'credentials',
-        message: 'Could not load the video.',
-      }),
-    ])
-})
-
-test('restores playback preferences and reports only choices made in the controls', async ({
-  page,
-}) => {
-  await page.goto('/test/e2e/?preferences')
-  await expect
-    .poll(() => playbackState(page))
-    .toMatchObject({ status: 'ready', playbackRate: 1.25 })
-  const sessionId = (await playbackState(page))?.sessionId
-  const tracks = () => readOutput<LibmediaTrackChangeEvent>(page, 'tracks')
-  const preferences = () =>
-    readOutput<LibmediaPlaybackPreferenceChangeEvent[]>(page, 'preferences')
-  await expect
-    .poll(() => readOutput(page, 'load-events'))
-    .toEqual([
-      {
-        type: 'ready',
-        event: {
-          src: '/media',
-          sessionId,
-          positionMs: 0,
-          durationMs: expect.any(Number),
-        },
-      },
-    ])
-
-  await page.locator('.lmp-center').click()
-  await expect.poll(tracks).toMatchObject({
-    sessionId,
-    audio: { streamIndex: 1 },
-    subtitle: { language: 'fra' },
-  })
-  await expect(
-    page.getByText('Fixture sidecar cue', { exact: true }),
-  ).toBeVisible()
-  expect(await preferences()).toEqual([])
-  await page.locator('.lmp-surface').click()
-
-  const captions = page.getByRole('button', { name: 'Subtitles', exact: true })
-  await captions.click()
-  await captions.click()
-  await captions.click()
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  const panel = page.locator('.lmp-panel')
-  await panel.getByRole('button', { name: /^Audio/ }).click()
-  await panel.getByRole('button', { name: 'Off', exact: true }).click()
-  await expect.poll(tracks).toMatchObject({ audio: null })
-  await panel.getByRole('button', { name: 'Back to settings' }).click()
-  await panel.getByRole('button', { name: /^Playback speed/i }).click()
-  await panel.getByRole('button', { name: '1.5×', exact: true }).click()
-  await expect.poll(preferences).toEqual(
-    [
-      { subtitles: { enabled: false } },
-      {
-        subtitles: {
-          enabled: true,
-          externalSubtitleId: 'fixture-french',
-          language: 'fra',
-        },
-      },
-      { subtitles: { enabled: false } },
-      { audio: null },
-      { playbackRate: 1.5 },
-    ].map((changes) => ({ src: '/media', sessionId, changes })),
-  )
-  await expect
-    .poll(() => playbackState(page))
-    .toMatchObject({
-      sessionId,
-      playbackRate: 1.5,
-    })
-
-  await page.getByRole('button', { name: 'Retry source' }).click()
-  await expect
-    .poll(() => playbackState(page))
-    .toMatchObject({ status: 'ready', playbackRate: 1.5 })
-  const retryId = (await playbackState(page))?.sessionId
-  expect(retryId).not.toBe(sessionId)
-  await expect(page.locator('.libmedia-player')).toHaveAttribute(
-    'data-captions',
-    'false',
-  )
-  await page.locator('.lmp-center').click()
-  await expect.poll(tracks).toMatchObject({
-    sessionId: retryId,
-    audio: null,
-    subtitle: null,
-  })
-  expect(await preferences()).toHaveLength(5)
-
-  await page.getByRole('button', { name: 'Load next source' }).click()
-  await expect
-    .poll(() => playbackState(page))
-    .toMatchObject({ src: '/media?next', status: 'ready', playbackRate: 1 })
-  await page.locator('.lmp-center').click()
-  await expect.poll(tracks).toMatchObject({
-    src: '/media?next',
-    audio: { streamIndex: 1 },
-    subtitle: { language: 'eng' },
-  })
-  expect(await preferences()).toHaveLength(5)
-  await expect(page.getByTestId('errors')).toHaveText('[]')
-})
 
 async function expectSeek(page: Page, targetMs: number) {
   await expect
@@ -272,7 +54,11 @@ test('plays protected Matroska and seeks when the timeline is clicked', async ({
   await expect
     .poll(() => playbackState(page))
     .toMatchObject({ status: 'ready' })
-  await page.locator('.lmp-center').click()
+  const player = page.getByRole('region', { name: 'Video player' })
+  await page.keyboard.press('Tab')
+  await expect(player).toBeFocused()
+  await expect(player).toHaveCSS('outline-style', 'none')
+  await player.locator('.lmp-center').click()
   await expect
     .poll(
       async () =>
@@ -288,82 +74,30 @@ test('plays protected Matroska and seeks when the timeline is clicked', async ({
   await expect(timeline.locator('.lmp-segment-buffer').first()).toBeVisible()
   await timeline.click(await timelinePosition(page, 7000))
   await expectSeek(page, 7000)
-  await expect(page.getByTestId('errors')).toHaveText('[]')
-})
-
-test('keeps shortcuts active after clicks in the player without a focus outline', async ({
-  page,
-}) => {
-  await page.goto('/test/e2e/')
-  const player = page.getByRole('region', { name: 'Video player' })
-  await expect(player).toHaveAttribute('data-status', 'ready')
-  await page.keyboard.press('Tab')
-  await expect(player).toBeFocused()
-  await expect(player).toHaveCSS('outline-style', 'none')
-
-  await player.locator('.lmp-center').click()
-  await expect(player).toHaveAttribute('data-status', 'playing')
-  await page.keyboard.press('Space')
-  await expect(player).toHaveAttribute('data-status', 'paused')
 
   await player.getByRole('button', { name: 'Mute', exact: true }).click()
   const unmute = player.getByRole('button', { name: 'Unmute', exact: true })
   await expect(unmute).toBeFocused()
-  await page.keyboard.press('Space')
-  await expect(player).toHaveAttribute('data-status', 'playing')
   await expect(unmute).toHaveCSS('outline-style', 'none')
 
   const surface = player.locator('.lmp-surface')
   await surface.click({ position: { x: 120, y: 120 } })
-  await expect(player).toHaveAttribute('data-status', 'paused')
   await expect(surface).toBeFocused()
-  await page.keyboard.press('k')
-  await expect(player).toHaveAttribute('data-status', 'playing')
   await expect(surface).toHaveCSS('outline-style', 'none')
-  await page.keyboard.press('Space')
-  await expect(player).toHaveAttribute('data-status', 'paused')
-
-  const timeline = player.locator('.lmp-timeline')
-  await timeline.click(await timelinePosition(page, 2000))
-  await expectSeek(page, 2000)
-  await page.keyboard.press('ArrowRight')
-  await expectSeek(page, 7000)
-
-  await page.getByTestId('state').click()
-  await page.keyboard.press('Space')
-  await expect(player).toHaveAttribute('data-status', 'paused')
+  await expect(page.getByTestId('errors')).toHaveText('[]')
 })
 
-test('shows media parameters and the active video decoder', async ({
+test('reports the active video decoder during real playback', async ({
   page,
 }) => {
   await page.goto('/test/e2e/')
   const player = page.getByRole('region', { name: 'Video player' })
   await expect(player).toHaveAttribute('data-status', 'ready')
-
-  async function openMediaInfo() {
-    await player.getByRole('button', { name: 'Settings', exact: true }).click()
-    await player.getByRole('button', { name: /Media info/ }).click()
-    return player.getByRole('region', { name: 'Media info' })
-  }
-
-  const info = await openMediaInfo()
-  await expect(info.getByText('Matroska', { exact: true })).toBeVisible()
-  await expect(info.getByText(/H\.264 \/ AVC/)).toBeVisible()
-  await expect(info.getByText('160 × 90', { exact: true })).toBeVisible()
-  await expect(info.getByText('10 fps', { exact: true })).toBeVisible()
-  await expect(info.getByText('8-bit', { exact: true })).toBeVisible()
-  await expect(info.getByText('Waiting for playback')).toBeVisible()
-  await info.getByRole('button', { name: 'Back to settings' }).click()
-  await expect(player.getByRole('button', { name: /Media info/ })).toBeFocused()
-  await player
-    .getByRole('region', { name: 'Settings', exact: true })
-    .getByRole('button', { name: 'Close menu', exact: true })
-    .click()
-
   await player.locator('.lmp-center').click()
   await expect(player).toHaveAttribute('data-status', 'playing')
-  await openMediaInfo()
+  await player.getByRole('button', { name: 'Settings', exact: true }).click()
+  await player.getByRole('button', { name: /Media info/ }).click()
+  const info = player.getByRole('region', { name: 'Media info' })
   await expect(
     info.getByText(
       /^(Browser \(MSE\)|WASM \(software\)|WebCodecs \(prefer (hardware|software)\))$/,
@@ -371,6 +105,19 @@ test('shows media parameters and the active video decoder', async ({
   ).toBeVisible()
   await expect(info.getByText('48000 Hz', { exact: true })).toBeVisible()
   await expect(info.getByText(/AAC/)).toBeVisible()
+})
+
+test('renders the preferred external SRT track during real playback', async ({
+  page,
+}) => {
+  await page.goto('/test/e2e/?sidecar')
+  const player = page.getByRole('region', { name: 'Video player' })
+  await expect(player).toHaveAttribute('data-status', 'ready')
+  await player.locator('.lmp-center').click()
+  await expect(
+    player.getByText('Fixture sidecar cue', { exact: true }),
+  ).toBeVisible()
+  await expect(page.getByTestId('errors')).toHaveText('[]')
 })
 
 test.describe('touch controls', () => {
@@ -432,7 +179,7 @@ test.describe('touch controls', () => {
     )
     await expect(
       page.getByText('Second fixture cue', { exact: true }),
-    ).toBeVisible()
+    ).toBeVisible({ timeout: 2000 })
   })
 })
 

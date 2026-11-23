@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './test/e2e',
+  fullyParallel: true,
+  workers: 2,
   use: {
     ...devices['Desktop Chrome'],
     channel: 'chrome',
