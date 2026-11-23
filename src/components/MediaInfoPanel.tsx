@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
+import { formatMediaTitle } from '../locales'
 import type { MediaInfo, PlaybackState } from '../usePlayback'
-import { clock, usePlayerLabels } from './player-ui'
+import { clock, usePlayerText } from './player-ui'
 
 type Details = Awaited<ReturnType<PlaybackState['getMediaDetails']>>
 const refreshIntervalMs = 1000
@@ -12,7 +13,8 @@ export function MediaInfoPanel({
   playback: PlaybackState
   media: MediaInfo
 }) {
-  const labels = usePlayerLabels()
+  const text = usePlayerText()
+  const { labels } = text
   const { getMediaDetails, selectedAudio, captions, status } = playback
   const selectedSubtitle = captions ? playback.selectedSubtitle : undefined
   const audioId = selectedAudio?.id
@@ -60,10 +62,15 @@ export function MediaInfoPanel({
     details?.audio?.id === audioId ? details?.audio : undefined
   const subtitleDetails =
     details?.subtitle?.id === subtitleId ? details?.subtitle : undefined
-  const audio = [selectedAudio?.label, audioDetails?.codec].filter(Boolean)
-  const subtitle = [selectedSubtitle?.label, subtitleDetails?.codec].filter(
-    Boolean,
-  )
+  const audio = [
+    selectedAudio && formatMediaTitle(text, 'audioTrack', selectedAudio),
+    audioDetails?.codec,
+  ].filter(Boolean)
+  const subtitle = [
+    selectedSubtitle &&
+      formatMediaTitle(text, 'subtitleTrack', selectedSubtitle),
+    subtitleDetails?.codec,
+  ].filter(Boolean)
   const rows = [
     [labels.container, details?.container],
     [

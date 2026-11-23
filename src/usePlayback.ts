@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import type { PlaybackNotice } from './locales'
 import { createPlaybackCommands } from './playback/commands'
 import { readMediaDetails } from './playback/media-details'
 import {
@@ -70,7 +71,7 @@ export function usePlayback(
   const [position, setPosition] = useState(0)
   const [pendingSeek, setPendingSeek] = useState<number>()
   const [busy, setBusy] = useState(false)
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState<PlaybackNotice>()
   const [tracks, setTracks] = useState<TrackSelection>({ captions: true })
   const [delay, setDelay] = useState(0)
   const [volume, setVolume] = useState(1)
@@ -179,7 +180,7 @@ export function usePlayback(
         : (initialPositionMs ?? 0)
       setStatus('loading')
       setMedia(undefined)
-      setNotice('')
+      setNotice(undefined)
       setPendingSeek(undefined)
       setBusy(false)
       setPosition(start)

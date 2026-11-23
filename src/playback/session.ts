@@ -1,4 +1,9 @@
 import type { BundledPlayer } from '../bundledPlayer'
+import {
+  formatPlaybackNotice,
+  type PlaybackNotice,
+  playerLocales,
+} from '../locales'
 import type {
   LibmediaErrorReason,
   LibmediaPlaybackProgress,
@@ -59,7 +64,7 @@ export interface PlaybackSession {
   classifyFailure: () => Promise<FailureDetail>
   reportError: (
     operation: LibmediaPlayerError['operation'],
-    message: string,
+    notice: PlaybackNotice,
     fatal: boolean,
     detail?: { reason?: LibmediaErrorReason; httpStatus?: number },
   ) => void
@@ -68,7 +73,7 @@ export interface PlaybackSession {
 interface SessionCallbacks {
   setStatus: (status: LibmediaPlaybackStatus) => void
   setPosition: (positionMs: number) => void
-  setNotice: (message: string) => void
+  setNotice: (notice: PlaybackNotice) => void
   setTracks: (selection: TrackSelection) => void
   setVolume: (volume: number) => void
   setDelay: (delay: number) => void
@@ -191,7 +196,7 @@ export function startPlaybackSession(
       setDelay: callbacks.setDelay,
       onTrackChange: (event) =>
         emit((events) => events.onTrackChange?.({ ...event, sessionId })),
-      onError: (message) => playback.reportError('track', message, false),
+      onError: (notice) => playback.reportError('track', notice, false),
     })
     const player = new AVPlayer({
       ...runtimeOptions,
@@ -284,16 +289,16 @@ export function startPlaybackSession(
       emit,
       classifyFailure: () =>
         describeFailure(mediaUrl, source.mediaRequest, signal),
-      reportError(operation, message, fatal, detail) {
+      reportError(operation, notice, fatal, detail) {
         if (!active || playback.status === 'error') return
         if (fatal) playback.setStatus('error')
-        else callbacks.setNotice(message)
+        else callbacks.setNotice(notice)
         emit((events) =>
           events.onError?.({
             src,
             sessionId,
             operation,
-            message,
+            message: formatPlaybackNotice(playerLocales.en, notice),
             fatal,
             reason: detail?.reason ?? 'unknown',
             ...(detail?.httpStatus === undefined
@@ -311,7 +316,7 @@ export function startPlaybackSession(
         source,
         signal,
         () => active && playback.status !== 'error',
-        (message) => playback.reportError('track', message, false),
+        (notice) => playback.reportError('track', notice, false),
       )
       if (!active || playback.status === 'error') return
       tracks.setSidecars(sidecars)
@@ -380,11 +385,7 @@ export function startPlaybackSession(
         await tracks.selectAudio(initialAudio)
       } catch {
         await tracks.selectAudio(null)
-        playback.reportError(
-          'track',
-          'The requested audio stream is unavailable.',
-          false,
-        )
+        playback.reportError('track', 'audioUnavailable', false)
       }
     } else {
       const audio = initialPlaybackPreferences?.audio
@@ -421,11 +422,7 @@ export function startPlaybackSession(
       }
       emit((events) => events.onInitialPositionResult?.(result))
       if (!restored) {
-        playback.reportError(
-          'seek',
-          'Could not restore the initial position.',
-          false,
-        )
+        playback.reportError('seek', 'initialPositionFailed', false)
       }
     }
     if (!active || playback.status !== 'loading') return

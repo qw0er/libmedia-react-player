@@ -16,6 +16,7 @@ const validRequest = { headers: { Authorization: 'Bearer fixture-token' } }
 const invalidRequest = { headers: { Authorization: 'Bearer expired-token' } }
 const params = new URLSearchParams(location.search)
 const expired = params.has('expired')
+const testLocale = params.has('locale')
 const testPreferences = params.has('preferences')
 const sidecar: ExternalSubtitleTrack = {
   id: 'fixture-french',
@@ -38,6 +39,7 @@ export function App() {
     LibmediaPlaybackPreferenceChangeEvent[]
   >([])
   const [nextSource, setNextSource] = useState(false)
+  const [chinese, setChinese] = useState(false)
   const preferences: LibmediaPlaybackPreferences | undefined = testPreferences
     ? nextSource
       ? {
@@ -66,6 +68,8 @@ export function App() {
         ref={player}
         src={nextSource ? '/media?next' : '/media'}
         sourceFormat="mkv"
+        locale={chinese ? 'zh-CN' : undefined}
+        labels={chinese ? { settings: '播放设置' } : undefined}
         mediaRequest={expired ? invalidRequest : validRequest}
         externalSubtitles={testPreferences ? [sidecar] : undefined}
         initialPlaybackPreferences={preferences}
@@ -80,6 +84,21 @@ export function App() {
         }
         onError={(error) => setErrors((previous) => [...previous, error])}
       />
+      {testLocale && (
+        <>
+          <button type="button" onClick={() => setChinese(!chinese)}>
+            Switch language
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void player.current?.selectAudio(999).catch(() => {})
+            }
+          >
+            Select missing audio
+          </button>
+        </>
+      )}
       {expired && (
         <button
           type="button"

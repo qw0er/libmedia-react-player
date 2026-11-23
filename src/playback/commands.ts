@@ -1,13 +1,14 @@
 import type { RefObject } from 'react'
+import { playerLocales } from '../locales'
 import type { LibmediaPlayerError, LibmediaPlayerHandle } from '../player-api'
-import { autoplayBlockedMessage, isAutoplayBlocked } from './autoplay'
+import { isAutoplayBlocked } from './autoplay'
 import type { PlaybackSession } from './session'
 import { seekTarget } from './source'
 import type { StyledSubtitleStatus } from './tracks'
 
 interface CommandCallbacks {
   setBusy: (busy: boolean) => void
-  setNotice: (notice: string) => void
+  setNotice: (notice: undefined) => void
   setPendingSeek: (positionMs: number | undefined) => void
 }
 
@@ -20,7 +21,7 @@ export function createPlaybackCommands(
 ) {
   function run<Result>(
     operation: LibmediaPlayerError['operation'],
-    message: string,
+    notice: keyof typeof playerLocales.en.notices,
     action: (current: PlaybackSession) => Promise<Result>,
     fatal = false,
   ): Promise<Result> {
@@ -34,9 +35,10 @@ export function createPlaybackCommands(
       )
     }
 
+    const message = playerLocales.en.notices[notice]
     const previousStatus = current.status
     setBusy(true)
-    setNotice('')
+    setNotice(undefined)
     const result = (async () => {
       try {
         const value = await action(current)
@@ -51,14 +53,14 @@ export function createPlaybackCommands(
           isAutoplayBlocked(error)
         ) {
           current.setStatus(previousStatus)
-          current.reportError(operation, autoplayBlockedMessage, false)
+          current.reportError(operation, 'autoplayBlocked', false)
           throw error
         }
         const detail =
           operation === 'seek' ? await current.classifyFailure() : undefined
         current.signal.throwIfAborted()
         if (current.status === 'error') throw new Error(message)
-        current.reportError(operation, message, fatal, detail)
+        current.reportError(operation, notice, fatal, detail)
         throw new Error(message)
       } finally {
         if (current.active) {
@@ -83,7 +85,7 @@ export function createPlaybackCommands(
     play() {
       return run(
         'play',
-        'Could not start playback.',
+        'playFailed',
         async (current) => {
           if (current.status === 'playing') return
           if (current.status === 'ended') current.suppressEnd = false
@@ -102,7 +104,7 @@ export function createPlaybackCommands(
       }
       return run(
         'pause',
-        'Could not pause playback.',
+        'pauseFailed',
         async (current) => {
           if (current.status === 'playing') await current.player.pause()
         },
@@ -120,7 +122,7 @@ export function createPlaybackCommands(
       if (target === undefined || !media) {
         return Promise.reject(new Error('The current source is not seekable.'))
       }
-      return run('seek', 'Could not seek.', async (current) => {
+      return run('seek', 'seekFailed', async (current) => {
         const preparing = current.status === 'ready'
         current.setSeeking(true)
         setPendingSeek(target)
@@ -145,17 +147,15 @@ export function createPlaybackCommands(
       })
     },
     selectAudio(selection) {
-      return run(
-        'track',
-        'Could not select the requested audio stream.',
-        (current) => current.tracks.selectAudio(selection),
+      return run('track', 'audioSelectionFailed', (current) =>
+        current.tracks.selectAudio(selection),
       )
     },
   }
   return {
     controls,
     selectSubtitle(id: number) {
-      return run('track', 'Could not switch subtitle tracks.', (current) =>
+      return run('track', 'subtitleSelectionFailed', (current) =>
         current.tracks.selectSubtitle(id),
       )
     },

@@ -1,5 +1,6 @@
+import { formatMediaTitle } from '../locales'
 import type { MediaInfo } from '../usePlayback'
-import { clock } from './player-ui'
+import { clock, usePlayerText } from './player-ui'
 
 export function ChapterList({
   chapters,
@@ -12,17 +13,20 @@ export function ChapterList({
   busy: boolean
   onSelect: (index: number) => void
 }) {
-  return chapters.map(({ start, label }, index) => (
+  const text = usePlayerText()
+  return chapters.map((chapter, index) => (
     <button
       className="lmp-choice lmp-chapter"
       type="button"
-      key={`${start}-${index}`}
+      key={`${chapter.start}-${index}`}
       disabled={busy}
       aria-current={current === index ? 'true' : undefined}
       onClick={() => onSelect(index)}
     >
-      <span className="lmp-choice-label">{label}</span>
-      <span className="lmp-chapter-time">{clock(start)}</span>
+      <span className="lmp-choice-label">
+        {formatMediaTitle(text, 'chapter', chapter)}
+      </span>
+      <span className="lmp-chapter-time">{clock(chapter.start)}</span>
     </button>
   ))
 }

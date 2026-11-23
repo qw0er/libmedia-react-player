@@ -10,9 +10,10 @@ import {
   Plus,
   Volume2,
 } from 'lucide-react'
+import { formatMediaTitle } from '../locales'
 import type { MediaInfo, PlaybackState } from '../usePlayback'
 import { VolumeSlider } from './PlaybackButtons'
-import { type PanelPage, usePlayerLabels } from './player-ui'
+import { type PanelPage, usePlayerLabels, usePlayerText } from './player-ui'
 
 type Setting = Exclude<PanelPage, 'settings' | 'chapters'>
 const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -56,7 +57,8 @@ export function SettingsHome({
   media: MediaInfo
   onPage: (page: Setting) => void
 }) {
-  const labels = usePlayerLabels()
+  const text = usePlayerText()
+  const { labels } = text
   const {
     selectedAudio,
     selectedSubtitle,
@@ -71,7 +73,11 @@ export function SettingsHome({
         <SettingLink
           icon={Headphones}
           label={labels.audio}
-          value={selectedAudio?.label ?? labels.off}
+          value={
+            selectedAudio
+              ? formatMediaTitle(text, 'audioTrack', selectedAudio)
+              : labels.off
+          }
           page="audio"
           onPage={onPage}
         />
@@ -80,7 +86,11 @@ export function SettingsHome({
         <SettingLink
           icon={Captions}
           label={labels.subtitles}
-          value={(captions && selectedSubtitle?.label) || labels.off}
+          value={
+            captions && selectedSubtitle
+              ? formatMediaTitle(text, 'subtitleTrack', selectedSubtitle)
+              : labels.off
+          }
           page="subtitles"
           onPage={onPage}
         />
@@ -151,7 +161,8 @@ export function TrackList({
   tracks: MediaInfo['audio']
   playback: PlaybackState
 }) {
-  const labels = usePlayerLabels()
+  const text = usePlayerText()
+  const { labels } = text
   const { captions, selectedAudio, selectedSubtitle } = playback
   const selectedId =
     kind === 'audio'
@@ -179,7 +190,11 @@ export function TrackList({
       {tracks.map((track) => (
         <TrackChoice
           key={track.id}
-          label={track.label}
+          label={formatMediaTitle(
+            text,
+            kind === 'audio' ? 'audioTrack' : 'subtitleTrack',
+            track,
+          )}
           language={track.language}
           selected={track.id === selectedId}
           busy={playback.busy}

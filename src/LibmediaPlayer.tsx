@@ -11,13 +11,13 @@ import { CenterControls } from './components/PlaybackButtons'
 import { PlayerControls } from './components/PlayerControls'
 import { PlayerPanel } from './components/PlayerPanel'
 import {
-  defaultLabels,
   type PanelPage,
-  PlayerLabels,
+  PlayerText,
   seekStepMs,
-  usePlayerLabels,
+  usePlayerText,
 } from './components/player-ui'
 import { StyledSubtitles } from './components/StyledSubtitles'
+import { formatPlaybackNotice, playerLocales } from './locales'
 import styles from './player.css?inline'
 import type { LibmediaPlayerProps } from './player-api'
 import { usePlayback } from './usePlayback'
@@ -31,6 +31,7 @@ export type {
   LibmediaControlLabels,
   LibmediaErrorReason,
   LibmediaInitialPositionResult,
+  LibmediaLocale,
   LibmediaPlaybackPreferenceChangeEvent,
   LibmediaPlaybackPreferences,
   LibmediaPlaybackProgress,
@@ -55,6 +56,7 @@ export function LibmediaPlayer({
   sourceFormat,
   mediaRequest,
   externalSubtitles = [],
+  locale = 'en',
   labels,
   ...props
 }: LibmediaPlayerProps) {
@@ -98,17 +100,21 @@ export function LibmediaPlayer({
     setSource({ signature, contents, revision: source.revision + 1 })
   }
 
+  const text = playerLocales[locale]
   return (
-    <PlayerLabels value={{ ...defaultLabels, ...labels }}>
+    <PlayerText
+      value={labels ? { ...text, labels: { ...text.labels, ...labels } } : text}
+    >
       <Playback
         key={source.revision}
+        locale={locale}
         {...props}
         src={src}
         sourceFormat={format}
         mediaRequest={mediaRequest}
         externalSubtitles={externalSubtitles}
       />
-    </PlayerLabels>
+    </PlayerText>
   )
 }
 
@@ -124,6 +130,7 @@ function Playback({
   style,
   onNextEpisode,
   ref,
+  locale,
   ...events
 }: LibmediaPlayerProps) {
   const [subtitleSources] = useState(() => externalSubtitles)
@@ -137,7 +144,8 @@ function Playback({
   )
   const [initialPosition] = useState(initialPositionMs)
   const [audio] = useState(initialAudio)
-  const labels = usePlayerLabels()
+  const text = usePlayerText()
+  const { labels } = text
   const playback = usePlayback(
     src,
     sourceFormat,
@@ -183,7 +191,9 @@ function Playback({
   const [panelOpen, setPanelOpen] = useState(false)
   const [nativeFullscreen, setNativeFullscreen] = useState(false)
   const [pageFullscreen, setPageFullscreen] = useState(false)
-  const [fullscreenError, setFullscreenError] = useState('')
+  const [fullscreenError, setFullscreenError] = useState<
+    'fullscreenFailed' | 'exitFullscreenFailed'
+  >()
   const [scrub, setScrub] = useState<number>()
 
   const duration = media?.duration ?? 0
@@ -259,7 +269,7 @@ function Playback({
   }
 
   async function toggleFullscreen() {
-    setFullscreenError('')
+    setFullscreenError(undefined)
     if (pageFullscreen) {
       setPageFullscreen(false)
       return
@@ -277,7 +287,7 @@ function Playback({
         await player.requestFullscreen()
       else setPageFullscreen(true)
     } catch {
-      setFullscreenError('Could not enter or exit fullscreen.')
+      setFullscreenError('fullscreenFailed')
     }
   }
 
@@ -286,13 +296,13 @@ function Playback({
   async function openNextEpisode() {
     if (!onNextEpisode || nextEpisodePending.current) return
     nextEpisodePending.current = true
-    setFullscreenError('')
+    setFullscreenError(undefined)
     setPageFullscreen(false)
     // Begin exiting fullscreen before pausing so the host chooser is visible.
     const exited = document.fullscreenElement
       ? document.exitFullscreen().catch(() => {
           if (document.fullscreenElement)
-            setFullscreenError('Could not exit fullscreen.')
+            setFullscreenError('exitFullscreenFailed')
         })
       : undefined
     const paused = controls.pause().catch(() => {})
@@ -398,6 +408,7 @@ function Playback({
       ref={root}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: Focus scopes shortcuts to this player.
       tabIndex={0}
+      lang={locale}
       aria-label={labels.player}
       aria-busy={status === 'loading' || status === 'starting' || buffering}
       className={className ? `libmedia-player ${className}` : 'libmedia-player'}
@@ -485,7 +496,7 @@ function Playback({
 
         {status === 'error' && (
           <div className="lmp-message" role="alert">
-            Playback failed. Check the video URL and browser compatibility.
+            {text.playbackFailed}
           </div>
         )}
 
@@ -504,7 +515,9 @@ function Playback({
 
         {(notice || fullscreenError) && (
           <div className="lmp-notice" role="status">
-            {notice || fullscreenError}
+            {notice
+              ? formatPlaybackNotice(text, notice)
+              : fullscreenError && text[fullscreenError]}
           </div>
         )}
 

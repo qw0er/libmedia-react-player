@@ -213,6 +213,8 @@ export interface LibmediaPlayerEvents {
   onError?: (event: LibmediaPlayerError) => void
 }
 
+export type LibmediaLocale = 'en' | 'zh-CN'
+
 export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   ref?: Ref<LibmediaPlayerHandle>
   src: string
@@ -227,6 +229,9 @@ export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   initialAudio?: LibmediaAudioSelection
   /** Sampled when a source loads. Updating this prop does not reload playback. */
   initialPlaybackPreferences?: LibmediaPlaybackPreferences
+  /** Language of the built-in interface. Defaults to English. */
+  locale?: LibmediaLocale
+  /** Overrides control labels from the selected locale. */
   labels?: Partial<LibmediaControlLabels>
   /** Additional CSS class for the player root. */
   className?: string

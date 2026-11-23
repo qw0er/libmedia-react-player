@@ -112,7 +112,8 @@ Use `sourceFormat` when the URL has no file extension. The player applies `media
 | `initialPositionMs`          | Resume position applied when the source loads                                                   |
 | `initialAudio`               | Exact file stream index or `null` for silence. Takes priority over the initial audio preference |
 | `initialPlaybackPreferences` | Saved audio, subtitle, and speed preferences applied when a source loads                        |
-| `labels`                     | Override control text and accessible names, including `nextEpisode`                             |
+| `locale`                     | Built-in interface language. Defaults to `en`, with `zh-CN` for Simplified Chinese              |
+| `labels`                     | Override control text and accessible names from the selected locale                             |
 | `className`                  | Additional CSS class on the player root                                                         |
 | `style`                      | Inline CSS styles on the player root                                                            |
 | `onNextEpisode`              | Shows the next-episode button; pauses and exits fullscreen before calling the host              |
@@ -132,6 +133,22 @@ episode starts windowed.
 ```tsx
 ;<LibmediaPlayer src={url} style={{ aspectRatio: '4 / 3' }} />
 ```
+
+### Interface language
+
+Set `locale="zh-CN"` for Simplified Chinese. The locale applies to controls,
+accessible names, player messages, and generated names for audio tracks,
+subtitles, and chapters. Titles supplied by the media file or host are
+preserved. Updating `locale` changes the interface without reloading playback.
+
+```tsx
+;<LibmediaPlayer src={url} locale="zh-CN" labels={{ audio: '配音' }} />
+```
+
+For an app that manages its own language setting, pass the current supported
+locale to the player. `LibmediaLocale` is exported for TypeScript callers.
+`labels` overrides individual control labels in the selected locale. Playback
+events and ref errors retain their existing values.
 
 ### Playback preferences
 

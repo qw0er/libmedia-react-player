@@ -1,4 +1,9 @@
 import type { BundledPlayer } from '../bundledPlayer'
+import {
+  formatMediaTitle,
+  type PlaybackNotice,
+  playerLocales,
+} from '../locales'
 import type {
   ExternalSubtitleTrack,
   LibmediaAudioPreference,
@@ -67,12 +72,25 @@ interface TrackCallbacks {
   setVolume: (volume: number) => void
   setDelay: (delay: number) => void
   onTrackChange: (event: Omit<LibmediaTrackChangeEvent, 'sessionId'>) => void
-  onError: (message: string) => void
+  onError: (notice: PlaybackNotice) => void
 }
 
-const unavailableAudioMessage = 'The requested audio stream is unavailable.'
+const unavailableAudioMessage = playerLocales.en.notices.audioUnavailable
 // libmedia's AVDisposition.DEFAULT.
 const defaultDisposition = 1
+
+function trackEventDetails(
+  kind: 'audioTrack' | 'subtitleTrack',
+  track: MediaInfo['audio'][number] | undefined,
+) {
+  if (!track) return null
+  return {
+    id: track.id,
+    streamIndex: track.streamIndex,
+    label: formatMediaTitle(playerLocales.en, kind, track),
+    language: track.language,
+  }
+}
 
 export function createPlaybackTracks(
   src: string,
@@ -146,7 +164,7 @@ export function createPlaybackTracks(
       getPlayback().player.getSelectedAudioStreamId() !== preferredAudioId()
     ) {
       audioSilent = true
-      callbacks.onError(unavailableAudioMessage)
+      callbacks.onError('audioUnavailable')
     }
     setVolume(userVolume)
   }
@@ -292,7 +310,7 @@ export function createPlaybackTracks(
           selection?.captions
         ) {
           bitmapSubtitles.delete(id)
-          callbacks.onError('Could not render the bitmap subtitle track.')
+          callbacks.onError('bitmapSubtitleFailed')
         }
       },
     }
@@ -387,8 +405,8 @@ export function createPlaybackTracks(
 
     callbacks.onTrackChange({
       src,
-      audio: selectedAudio ? { ...selectedAudio } : null,
-      subtitle: visibleSubtitle ? { ...visibleSubtitle } : null,
+      audio: trackEventDetails('audioTrack', selectedAudio),
+      subtitle: trackEventDetails('subtitleTrack', visibleSubtitle),
     })
   }
 
@@ -407,9 +425,7 @@ export function createPlaybackTracks(
     callbacks.setTracks(selection)
     if (status === 'fallback') {
       failedStyledSubtitles.add(id)
-      callbacks.onError(
-        'Could not render styled subtitles. Using libmedia subtitles for this track.',
-      )
+      callbacks.onError('styledSubtitleFallback')
     }
   }
 

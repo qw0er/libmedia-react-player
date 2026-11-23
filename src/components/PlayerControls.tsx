@@ -8,9 +8,10 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react'
+import { formatMediaTitle } from '../locales'
 import type { MediaInfo, PlaybackState } from '../usePlayback'
 import { PlayButton, VolumeSlider } from './PlaybackButtons'
-import { clock, type PanelPage, usePlayerLabels } from './player-ui'
+import { clock, type PanelPage, usePlayerText } from './player-ui'
 import { Timeline } from './Timeline'
 
 interface ControlsProps {
@@ -44,7 +45,8 @@ export function PlayerControls({
   onFullscreen,
   onPanel,
 }: ControlsProps) {
-  const labels = usePlayerLabels()
+  const text = usePlayerText()
+  const { labels } = text
   const { duration, chapters, live } = media
   const { status, busy, volume, captions, selectedSubtitle } = playback
   const VolumeIcon = volume > 0 ? Volume2 : VolumeX
@@ -121,7 +123,7 @@ export function PlayerControls({
             {timeDisplay}
             {chapterIndex >= 0 && (
               <span className="lmp-current-chapter">
-                {chapters[chapterIndex].label}
+                {formatMediaTitle(text, 'chapter', chapters[chapterIndex])}
               </span>
             )}
             <ChevronUp aria-hidden="true" />

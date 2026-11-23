@@ -17,6 +17,70 @@ function playbackState(page: Page) {
   return readOutput<LibmediaPlaybackState>(page, 'state')
 }
 
+test('switches the interface language during playback and keeps the session', async ({
+  page,
+}) => {
+  await page.goto('/test/e2e/?locale')
+  const player = page.locator('.libmedia-player')
+  const switchLanguage = page.getByRole('button', { name: 'Switch language' })
+  await expect(player).toHaveAccessibleName('Video player')
+  await expect(player).toHaveAttribute('data-status', 'ready')
+  await player.locator('.lmp-center').click()
+  await expect(player).toHaveAttribute('data-status', 'playing')
+  const sessionId = (await playbackState(page))?.sessionId
+  expect(sessionId).toBeTruthy()
+
+  await switchLanguage.click()
+  await expect(player).toHaveAttribute('lang', 'zh-CN')
+  await expect(player).toHaveAccessibleName('视频播放器')
+  await expect
+    .poll(() => playbackState(page))
+    .toMatchObject({ sessionId, status: 'playing' })
+  await player.getByRole('button', { name: '播放设置', exact: true }).click()
+  const panel = player.locator('.lmp-panel')
+  await expect(panel.getByText('音轨 1', { exact: true })).toBeVisible()
+  await expect(panel.getByText('English', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Select missing audio' }).click()
+  await expect(player.getByRole('status')).toHaveText('无法选择指定音轨。')
+  await switchLanguage.click()
+  await expect(player.getByRole('status')).toHaveText(
+    'Could not select the requested audio stream.',
+  )
+  await expect(player).toHaveAccessibleName('Video player')
+  await expect
+    .poll(() => playbackState(page))
+    .toMatchObject({ sessionId, status: 'playing' })
+})
+
+test('localizes the playback failure overlay without retrying the media', async ({
+  page,
+}) => {
+  await page.goto('/test/e2e/?locale&expired')
+  const alert = page.getByRole('alert')
+  await expect(alert).toHaveText(
+    'Playback failed. Check the video URL and browser compatibility.',
+  )
+  const sessionId = (await playbackState(page))?.sessionId
+  expect(sessionId).toBeTruthy()
+
+  await page.getByRole('button', { name: 'Switch language' }).click()
+  await expect(alert).toHaveText('播放失败，请检查视频链接和浏览器兼容性。')
+  await expect
+    .poll(() => playbackState(page))
+    .toMatchObject({ sessionId, status: 'error' })
+  await expect
+    .poll(() => readOutput<LibmediaPlayerError[]>(page, 'errors'))
+    .toEqual([
+      expect.objectContaining({
+        sessionId,
+        operation: 'load',
+        reason: 'credentials',
+        message: 'Could not load the video.',
+      }),
+    ])
+})
+
 test('restores playback preferences and reports only choices made in the controls', async ({
   page,
 }) => {

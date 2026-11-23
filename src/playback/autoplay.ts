@@ -1,7 +1,5 @@
+import { playerLocales } from '../locales'
 import type { PlaybackSession } from './session'
-
-export const autoplayBlockedMessage =
-  'Automatic playback was blocked. Select Play to continue.'
 
 export function isAutoplayBlocked(error: unknown): error is DOMException {
   return error instanceof DOMException && error.name === 'NotAllowedError'
@@ -27,7 +25,10 @@ export async function startPlayback(
     await player.resume()
     signal.throwIfAborted()
     if (checkAutoplay && player.isSuspended()) {
-      throw new DOMException(autoplayBlockedMessage, 'NotAllowedError')
+      throw new DOMException(
+        playerLocales.en.notices.autoplayBlocked,
+        'NotAllowedError',
+      )
     }
   }
   const preparedStatus = player.getStatus()

@@ -1,7 +1,8 @@
 import { type CSSProperties, type PointerEvent, useRef, useState } from 'react'
+import { formatMediaTitle } from '../locales'
 import type { BufferedRange } from '../useBuffering'
 import type { MediaInfo } from '../usePlayback'
-import { clock, seekStepMs, usePlayerLabels } from './player-ui'
+import { clock, seekStepMs, usePlayerText } from './player-ui'
 
 interface TimelineProps {
   chapters: MediaInfo['chapters']
@@ -22,7 +23,8 @@ export function Timeline({
   onScrub,
   onSeek,
 }: TimelineProps) {
-  const labels = usePlayerLabels()
+  const text = usePlayerText()
+  const { labels } = text
   const activePointer = useRef<number | null>(null)
   const [hover, setHover] = useState<number>()
   const starts = [
@@ -95,7 +97,9 @@ export function Timeline({
             } as CSSProperties
           }
         >
-          {previewChapter && <span>{previewChapter.label}</span>}{' '}
+          {previewChapter && (
+            <span>{formatMediaTitle(text, 'chapter', previewChapter)}</span>
+          )}{' '}
           {clock(preview)}
         </div>
       )}

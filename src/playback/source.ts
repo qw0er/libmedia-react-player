@@ -1,4 +1,5 @@
 import type { BundledPlayer } from '../bundledPlayer'
+import type { PlaybackNotice } from '../locales'
 import type {
   ExternalSubtitleTrack,
   LibmediaAudioSelection,
@@ -28,7 +29,7 @@ export async function loadSource(
   source: PlaybackSource,
   signal: AbortSignal,
   canLoadSidecars: () => boolean,
-  onSubtitleError: (message: string) => void,
+  onSubtitleError: (notice: PlaybackNotice) => void,
 ) {
   await player.load(new URL(source.src, document.baseURI).href, {
     ext: source.sourceFormat,
@@ -70,7 +71,7 @@ export async function loadSource(
         content === undefined ? sidecarDeadline : undefined,
       )
     } catch {
-      onSubtitleError(`Could not load external subtitle track ${index + 1}.`)
+      onSubtitleError({ externalSubtitleTrack: index + 1 })
       continue
     }
     const stream = player.getStreams()[count]
@@ -83,11 +84,11 @@ function metadataText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function readTracks(streams: TrackStream[], fallback: string) {
+function readTracks(streams: TrackStream[]) {
   const tracks = streams.map(({ id, index: streamIndex, metadata }, index) => ({
     id,
     streamIndex,
-    label: metadataText(metadata.title),
+    title: metadataText(metadata.title),
     language: metadataText(metadata.language) || undefined,
     number: index + 1,
   }))
@@ -96,19 +97,12 @@ function readTracks(streams: TrackStream[], fallback: string) {
     const duplicate = tracks.some(
       (other) =>
         other.id !== track.id &&
-        other.label === track.label &&
+        other.title === track.title &&
         other.language === track.language,
     )
-    const number = `${fallback} ${track.number}`
     return {
-      id: track.id,
-      streamIndex: track.streamIndex,
-      label: track.label
-        ? duplicate
-          ? `${track.label} (${number})`
-          : track.label
-        : number,
-      language: track.language,
+      ...track,
+      number: !track.title || duplicate ? track.number : undefined,
     }
   })
 }
@@ -128,12 +122,14 @@ export function readMedia(
     .getChapters()
     .flatMap(({ start, timeBase, metadata }, index) => {
       if (timeBase.den <= 0 || timeBase.num <= 0 || start < 0n) return []
+      const title = metadataText(metadata.title)
       return [
         {
           start: Number(
             (start * BigInt(timeBase.num) * 1000n) / BigInt(timeBase.den),
           ),
-          label: metadataText(metadata.title) || `Chapter ${index + 1}`,
+          title,
+          number: title ? undefined : index + 1,
         },
       ]
     })
@@ -145,25 +141,19 @@ export function readMedia(
     videoDetails: readVideoDetails(streams, -1, true),
     videoAspectRatio:
       video?.width && video.height ? video.width / video.height : undefined,
-    audio: readTracks(
-      streams.filter((stream) => stream.mediaType === 'Audio'),
-      'Audio',
-    ),
-    subtitles: readTracks(
-      [
-        ...streams.filter(
-          (stream) =>
-            stream.mediaType === 'Subtitle' &&
-            (supportedCodecs.includes(stream.codecparProxy.codecId) ||
-              player.embeddedBitmapSubtitleFormat(stream.id)),
-        ),
-        ...bitmapSidecars.map((stream, index) => ({
-          ...stream,
-          index: nextStreamIndex + index,
-        })),
-      ],
-      'Subtitle',
-    ),
+    audio: readTracks(streams.filter((stream) => stream.mediaType === 'Audio')),
+    subtitles: readTracks([
+      ...streams.filter(
+        (stream) =>
+          stream.mediaType === 'Subtitle' &&
+          (supportedCodecs.includes(stream.codecparProxy.codecId) ||
+            player.embeddedBitmapSubtitleFormat(stream.id)),
+      ),
+      ...bitmapSidecars.map((stream, index) => ({
+        ...stream,
+        index: nextStreamIndex + index,
+      })),
+    ]),
   }
 }
 
