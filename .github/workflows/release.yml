@@ -3,7 +3,7 @@ name: Publish to npm
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   publish:
@@ -29,4 +29,6 @@ jobs:
           fi
       - run: npm ci
       - run: npm run setup:libmedia
+      - run: npx playwright install --with-deps chrome
+      - run: npm run check
       - run: npm publish --access public

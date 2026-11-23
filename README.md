@@ -224,7 +224,7 @@ npm run dev
 | Command                  | Purpose                                                                                  |
 | ------------------------ | ---------------------------------------------------------------------------------------- |
 | `npm run build:libmedia` | Rebuild the AVPlayer runtime, audio worklets, and declarations from the checked-out fork |
-| `npm run check`          | Biome and TypeScript checks                                                              |
+| `npm run check`          | Run Biome, TypeScript, and both test suites                                              |
 | `npm run build`          | Build the library and declarations into `dist/`                                          |
 
 The submodule pins the source of both the browser runtime and TypeScript declarations.
