@@ -80,6 +80,14 @@ export interface LibmediaInitialPositionResult extends LibmediaSeekEvent {
   restored: boolean
 }
 
+export interface LibmediaReadyEvent extends LibmediaPlaybackProgress {
+  /** Included when this load attempt tried to restore a starting position. */
+  initialPositionResult?: Pick<
+    LibmediaInitialPositionResult,
+    'requestedPositionMs' | 'restored'
+  >
+}
+
 export interface LibmediaTrack {
   /** Track ID for the current playback session. */
   id: number
@@ -100,6 +108,8 @@ export interface LibmediaAudioPreference {
   streamIndex?: number
   /** Fall back to this language when the exact selection is unavailable. */
   language?: string
+  /** Require the supplied streamIndex. If unavailable, play silently and report a track error. */
+  strict?: boolean
 }
 
 export type LibmediaSubtitlePreference =
@@ -196,12 +206,15 @@ export interface LibmediaPlayerHandle {
 }
 
 export interface LibmediaPlayerEvents {
-  /** Fires once after the source is loaded and its initial position is prepared. */
-  onReady?: (event: LibmediaPlaybackProgress) => void
+  /** Fires once after the source is loaded and any initial seek has settled. */
+  onReady?: (event: LibmediaReadyEvent) => void
   onTimeUpdate?: (event: LibmediaPlaybackProgress) => void
   onPlaybackStateChange?: (event: LibmediaPlaybackState) => void
   onSeeked?: (event: LibmediaSeekEvent) => void
-  /** Reports the outcome of a supplied initialPositionMs before onReady. */
+  /**
+   * Reports the outcome of a supplied initialPositionMs before onReady.
+   * @deprecated Read `event.initialPositionResult` in `onReady`.
+   */
   onInitialPositionResult?: (event: LibmediaInitialPositionResult) => void
   /** Reports the initial selection when playback starts and subsequent changes. */
   onTrackChange?: (event: LibmediaTrackChangeEvent) => void
@@ -225,7 +238,10 @@ export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   externalSubtitles?: readonly ExternalSubtitleTrack[]
   /** Applied once when the source loads. Use seekTo to change position later. */
   initialPositionMs?: number
-  /** Exact audio selection. Takes priority over the initial audio preference. */
+  /**
+   * Exact audio selection. Takes priority over the initial audio preference.
+   * @deprecated Use `initialPlaybackPreferences.audio` with `{ streamIndex, strict: true }` or `null`.
+   */
   initialAudio?: LibmediaAudioSelection
   /** Sampled when a source loads. Updating this prop does not reload playback. */
   initialPlaybackPreferences?: LibmediaPlaybackPreferences

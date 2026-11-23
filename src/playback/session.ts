@@ -11,6 +11,7 @@ import type {
   LibmediaPlaybackStatus,
   LibmediaPlayerError,
   LibmediaPlayerEvents,
+  LibmediaReadyEvent,
 } from '../player-api'
 import { startPlayback } from './autoplay'
 import { describeFailure, type FailureDetail } from './failure'
@@ -90,8 +91,7 @@ export function startPlaybackSession(
   sessionId: string,
   callbacks: SessionCallbacks,
 ) {
-  const { src, initialAudio, initialPositionMs, initialPlaybackPreferences } =
-    source
+  const { src, initialPositionMs, initialPlaybackPreferences } = source
   const mediaUrl = new URL(src, document.baseURI).href
   const lifetime = new AbortController()
   const { signal } = lifetime
@@ -380,15 +380,15 @@ export function startPlaybackSession(
 
     const media = await load()
     if (!media || !active || playback.status !== 'loading') return
-    if (initialAudio !== undefined) {
+    const audio = initialPlaybackPreferences?.audio
+    if (audio?.strict && audio.streamIndex !== undefined) {
       try {
-        await tracks.selectAudio(initialAudio)
+        await tracks.selectAudio(audio.streamIndex)
       } catch {
         await tracks.selectAudio(null)
         playback.reportError('track', 'audioUnavailable', false)
       }
     } else {
-      const audio = initialPlaybackPreferences?.audio
       const stream = audio == null ? audio : tracks.preferredAudioStream(audio)
       if (stream !== undefined) await tracks.selectAudio(stream, false)
     }
@@ -396,6 +396,7 @@ export function startPlaybackSession(
     const rate = initialPlaybackPreferences?.playbackRate
     if (!media.live && rate !== undefined && rate >= 0.5 && rate <= 2)
       player.setPlaybackRate(rate)
+    let initialPositionResult: LibmediaReadyEvent['initialPositionResult']
     if (initialPositionMs !== undefined) {
       let restored = initialPositionMs === 0
       const start = seekTarget(media, initialPositionMs)
@@ -415,11 +416,11 @@ export function startPlaybackSession(
         }
       }
       if (!active || playback.status !== 'loading') return
-      const result = {
-        ...playback.progress(),
+      initialPositionResult = {
         requestedPositionMs: initialPositionMs,
         restored,
       }
+      const result = { ...playback.progress(), ...initialPositionResult }
       emit((events) => events.onInitialPositionResult?.(result))
       if (!restored) {
         playback.reportError('seek', 'initialPositionFailed', false)
@@ -434,8 +435,11 @@ export function startPlaybackSession(
     observer.observe(container)
     callbacks.onReady(playback, media)
     playback.setStatus('ready')
-    const progress = playback.progress()
-    emit((events) => events.onReady?.(progress))
+    const ready: LibmediaReadyEvent = {
+      ...playback.progress(),
+      ...(initialPositionResult && { initialPositionResult }),
+    }
+    emit((events) => events.onReady?.(ready))
   }
 
   publishState({

@@ -183,7 +183,9 @@ export default function App() {
                     mediaRequest={options.mediaRequest}
                     externalSubtitles={options.externalSubtitles}
                     initialPositionMs={options.initialPositionMs}
-                    initialAudio={options.initialAudio}
+                    initialPlaybackPreferences={
+                      options.initialPlaybackPreferences
+                    }
                     onPlaybackStateChange={(event) => {
                       setPlayback(event)
                       if (event.status === 'loading') {
@@ -200,9 +202,6 @@ export default function App() {
                       setProgress(event)
                       log('onReady', eventDetails(event))
                     }}
-                    onInitialPositionResult={(event) =>
-                      log('onInitialPositionResult', eventDetails(event))
-                    }
                     onSeeked={(event) => {
                       setProgress(event)
                       log('onSeeked', eventDetails(event))

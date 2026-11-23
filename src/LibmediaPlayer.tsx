@@ -19,7 +19,10 @@ import {
 import { StyledSubtitles } from './components/StyledSubtitles'
 import { formatPlaybackNotice, playerLocales } from './locales'
 import styles from './player.css?inline'
-import type { LibmediaPlayerProps } from './player-api'
+import type {
+  LibmediaPlaybackPreferences,
+  LibmediaPlayerProps,
+} from './player-api'
 import { usePlayback } from './usePlayback'
 
 export type {
@@ -42,6 +45,7 @@ export type {
   LibmediaPlayerEvents,
   LibmediaPlayerHandle,
   LibmediaPlayerProps,
+  LibmediaReadyEvent,
   LibmediaRequestOptions,
   LibmediaRetryOptions,
   LibmediaSeekEvent,
@@ -143,7 +147,18 @@ function Playback({
       : undefined,
   )
   const [initialPosition] = useState(initialPositionMs)
-  const [audio] = useState(initialAudio)
+  const [initialPreferences] = useState<
+    LibmediaPlaybackPreferences | undefined
+  >(() => {
+    if (initialAudio === undefined) return initialPlaybackPreferences
+    return {
+      ...initialPlaybackPreferences,
+      audio:
+        initialAudio === null
+          ? null
+          : { streamIndex: initialAudio, strict: true },
+    }
+  })
   const text = usePlayerText()
   const { labels } = text
   const playback = usePlayback(
@@ -152,8 +167,7 @@ function Playback({
     request,
     subtitleSources,
     initialPosition,
-    audio,
-    initialPlaybackPreferences,
+    initialPreferences,
     events,
   )
   const { controls } = playback

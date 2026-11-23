@@ -1,5 +1,6 @@
 import {
   type ExternalSubtitleTrack,
+  type LibmediaInitialPositionResult,
   type LibmediaPlaybackPreferenceChangeEvent,
   type LibmediaPlaybackPreferences,
   type LibmediaPlaybackProgress,
@@ -7,6 +8,7 @@ import {
   LibmediaPlayer,
   type LibmediaPlayerError,
   type LibmediaPlayerHandle,
+  type LibmediaReadyEvent,
   type LibmediaSeekEvent,
   type LibmediaTrackChangeEvent,
 } from 'libmedia-react-player'
@@ -18,6 +20,8 @@ const params = new URLSearchParams(location.search)
 const expired = params.has('expired')
 const testLocale = params.has('locale')
 const testPreferences = params.has('preferences')
+const audioMode = params.get('audio')
+const initialPosition = params.get('initialPosition')
 const sidecar: ExternalSubtitleTrack = {
   id: 'fixture-french',
   label: 'French sidecar',
@@ -40,6 +44,12 @@ export function App() {
   >([])
   const [nextSource, setNextSource] = useState(false)
   const [chinese, setChinese] = useState(false)
+  const [loadEvents, setLoadEvents] = useState<
+    (
+      | { type: 'ready'; event: LibmediaReadyEvent }
+      | { type: 'initialPositionResult'; event: LibmediaInitialPositionResult }
+    )[]
+  >([])
   const preferences: LibmediaPlaybackPreferences | undefined = testPreferences
     ? nextSource
       ? {
@@ -60,7 +70,11 @@ export function App() {
           playbackRate: 1.25,
           ...Object.assign({}, ...changes.map((event) => event.changes)),
         }
-    : undefined
+    : audioMode === 'strict'
+      ? { audio: { streamIndex: 999, strict: true } }
+      : audioMode === 'legacy'
+        ? { audio: { streamIndex: 1 } }
+        : undefined
 
   return (
     <>
@@ -73,8 +87,20 @@ export function App() {
         mediaRequest={expired ? invalidRequest : validRequest}
         externalSubtitles={testPreferences ? [sidecar] : undefined}
         initialPlaybackPreferences={preferences}
-        initialAudio={nextSource ? 1 : undefined}
+        initialAudio={nextSource ? 1 : audioMode === 'legacy' ? 999 : undefined}
+        initialPositionMs={
+          initialPosition === null ? undefined : Number(initialPosition)
+        }
         style={{ maxWidth: 720 }}
+        onReady={(event) =>
+          setLoadEvents((previous) => [...previous, { type: 'ready', event }])
+        }
+        onInitialPositionResult={(event) =>
+          setLoadEvents((previous) => [
+            ...previous,
+            { type: 'initialPositionResult', event },
+          ])
+        }
         onPlaybackStateChange={setState}
         onTimeUpdate={setProgress}
         onSeeked={setSeek}
@@ -115,10 +141,11 @@ export function App() {
           <button type="button" onClick={() => setNextSource(true)}>
             Load next source
           </button>
-          <output data-testid="tracks">{JSON.stringify(tracks)}</output>
           <output data-testid="preferences">{JSON.stringify(changes)}</output>
         </>
       )}
+      <output data-testid="tracks">{JSON.stringify(tracks)}</output>
+      <output data-testid="load-events">{JSON.stringify(loadEvents)}</output>
       <output data-testid="state">{JSON.stringify(state)}</output>
       <output data-testid="progress">{JSON.stringify(progress)}</output>
       <output data-testid="seek">{JSON.stringify(seek)}</output>

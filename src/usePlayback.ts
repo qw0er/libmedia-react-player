@@ -43,14 +43,12 @@ export function usePlayback(
   mediaRequest: LibmediaRequestOptions | undefined,
   externalSubtitles: readonly ExternalSubtitleTrack[],
   initialPositionMs: number | undefined,
-  initialAudio: LibmediaAudioSelection | undefined,
-  initialPlaybackPreferences: LibmediaPlaybackPreferences | undefined,
+  initialPreferences: LibmediaPlaybackPreferences | undefined,
   events: LibmediaPlayerEvents,
 ) {
   const viewport = useRef<HTMLDivElement>(null)
   const session = useRef<PlaybackSession | null>(null)
   const listeners = useRef(events)
-  const [initialPreferences] = useState(initialPlaybackPreferences)
   const preferenceChanges = useRef<LibmediaPlaybackPreferences>({})
   const stalled = useRef(false)
   const latest = useRef({ position: 0, loaded: false })
@@ -117,10 +115,6 @@ export function usePlayback(
         mediaRequest: activeRequest,
         externalSubtitles,
         initialPositionMs: activePosition,
-        initialAudio:
-          preferenceChanges.current.audio === undefined
-            ? initialAudio
-            : undefined,
         initialPlaybackPreferences: {
           ...initialPreferences,
           ...preferenceChanges.current,
@@ -155,7 +149,6 @@ export function usePlayback(
     activeRequest,
     externalSubtitles,
     activePosition,
-    initialAudio,
     initialPreferences,
     restart,
   ])

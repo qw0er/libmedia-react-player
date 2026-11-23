@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import type {
   ExternalSubtitleTrack,
-  LibmediaAudioSelection,
+  LibmediaPlaybackPreferences,
   LibmediaRequestOptions,
   LibmediaRetryOptions,
 } from '../src/player-api'
@@ -23,7 +23,7 @@ export interface DemoSource {
   mediaRequest?: LibmediaRequestOptions
   externalSubtitles?: ExternalSubtitleTrack[]
   initialPositionMs?: number
-  initialAudio?: LibmediaAudioSelection
+  initialPlaybackPreferences?: LibmediaPlaybackPreferences
   finalCue?: boolean
 }
 
@@ -84,8 +84,15 @@ export function SourceForm({
         mediaRequest: requestOptions(headers, credentials),
         externalSubtitles,
         initialPositionMs: position === '' ? undefined : Number(position),
-        initialAudio:
-          audio === '' ? undefined : audio === '-1' ? null : Number(audio),
+        initialPlaybackPreferences:
+          audio === ''
+            ? undefined
+            : {
+                audio:
+                  audio === '-1'
+                    ? null
+                    : { streamIndex: Number(audio), strict: true },
+              },
         finalCue,
       })
     } catch (cause) {

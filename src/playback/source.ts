@@ -2,7 +2,6 @@ import type { BundledPlayer } from '../bundledPlayer'
 import type { PlaybackNotice } from '../locales'
 import type {
   ExternalSubtitleTrack,
-  LibmediaAudioSelection,
   LibmediaPlaybackPreferences,
   LibmediaRequestOptions,
 } from '../player-api'
@@ -20,7 +19,6 @@ export interface PlaybackSource {
   mediaRequest?: LibmediaRequestOptions
   externalSubtitles: readonly ExternalSubtitleTrack[]
   initialPositionMs?: number
-  initialAudio?: LibmediaAudioSelection
   initialPlaybackPreferences?: LibmediaPlaybackPreferences
 }
 

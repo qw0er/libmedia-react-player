@@ -17,6 +17,55 @@ function playbackState(page: Page) {
   return readOutput<LibmediaPlaybackState>(page, 'state')
 }
 
+for (const mode of ['strict', 'legacy']) {
+  test(`keeps playback silent for an unavailable ${mode} audio selection`, async ({
+    page,
+  }) => {
+    await page.goto(`/test/e2e/?audio=${mode}`)
+    await expect
+      .poll(() => readOutput<LibmediaPlayerError[]>(page, 'errors'))
+      .toMatchObject([{ operation: 'track', fatal: false }])
+    await page.locator('.lmp-center').click()
+    await expect
+      .poll(() => playbackState(page))
+      .toMatchObject({ status: 'playing' })
+    await expect
+      .poll(() => readOutput<LibmediaTrackChangeEvent>(page, 'tracks'))
+      .toMatchObject({ audio: null })
+  })
+}
+
+for (const initialPosition of ['5000', 'NaN']) {
+  test(`reports the initial seek result for ${initialPosition} in onReady`, async ({
+    page,
+  }) => {
+    const restored = initialPosition === '5000'
+    await page.goto(`/test/e2e/?initialPosition=${initialPosition}`)
+    await expect
+      .poll(() => readOutput(page, 'load-events'))
+      .toMatchObject([
+        { type: 'initialPositionResult', event: { restored } },
+        { type: 'ready', event: { initialPositionResult: { restored } } },
+      ])
+    const [legacy, ready] = JSON.parse(
+      (await page.getByTestId('load-events').textContent()) ?? '[]',
+    )
+    const {
+      requestedPositionMs,
+      restored: legacyRestored,
+      ...progress
+    } = legacy.event
+    expect(ready.event).toEqual({
+      ...progress,
+      initialPositionResult: { requestedPositionMs, restored: legacyRestored },
+    })
+    if (restored) {
+      expect(requestedPositionMs).toBe(5000)
+      expect(progress.positionMs).toBeGreaterThan(0)
+    }
+  })
+}
+
 test('switches the interface language during playback and keeps the session', async ({
   page,
 }) => {
@@ -92,6 +141,19 @@ test('restores playback preferences and reports only choices made in the control
   const tracks = () => readOutput<LibmediaTrackChangeEvent>(page, 'tracks')
   const preferences = () =>
     readOutput<LibmediaPlaybackPreferenceChangeEvent[]>(page, 'preferences')
+  await expect
+    .poll(() => readOutput(page, 'load-events'))
+    .toEqual([
+      {
+        type: 'ready',
+        event: {
+          src: '/media',
+          sessionId,
+          positionMs: 0,
+          durationMs: expect.any(Number),
+        },
+      },
+    ])
 
   await page.locator('.lmp-center').click()
   await expect.poll(tracks).toMatchObject({

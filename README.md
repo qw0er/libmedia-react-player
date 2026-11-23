@@ -103,21 +103,21 @@ Use `sourceFormat` when the URL has no file extension. The player applies `media
 
 ### Props
 
-| Prop                         | Purpose                                                                                         |
-| ---------------------------- | ----------------------------------------------------------------------------------------------- |
-| `src`                        | Required media URL                                                                              |
-| `sourceFormat`               | Extension hint such as `mp4`, `mkv`, or `webm`                                                  |
-| `mediaRequest`               | Optional fetch headers and credentials mode                                                     |
-| `externalSubtitles`          | Subtitle tracks supplied by the host                                                            |
-| `initialPositionMs`          | Resume position applied when the source loads                                                   |
-| `initialAudio`               | Exact file stream index or `null` for silence. Takes priority over the initial audio preference |
-| `initialPlaybackPreferences` | Saved audio, subtitle, and speed preferences applied when a source loads                        |
-| `locale`                     | Built-in interface language. Defaults to `en`, with `zh-CN` for Simplified Chinese              |
-| `labels`                     | Override control text and accessible names from the selected locale                             |
-| `className`                  | Additional CSS class on the player root                                                         |
-| `style`                      | Inline CSS styles on the player root                                                            |
-| `onNextEpisode`              | Shows the next-episode button; pauses and exits fullscreen before calling the host              |
-| `ref`                        | `Ref<LibmediaPlayerHandle>` for playback commands                                               |
+| Prop                         | Purpose                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| `src`                        | Required media URL                                                                 |
+| `sourceFormat`               | Extension hint such as `mp4`, `mkv`, or `webm`                                     |
+| `mediaRequest`               | Optional fetch headers and credentials mode                                        |
+| `externalSubtitles`          | Subtitle tracks supplied by the host                                               |
+| `initialPositionMs`          | Resume position applied when the source loads                                      |
+| `initialAudio`               | Deprecated. Use `initialPlaybackPreferences.audio` for exact selection or silence  |
+| `initialPlaybackPreferences` | Saved audio, subtitle, and speed preferences applied when a source loads           |
+| `locale`                     | Built-in interface language. Defaults to `en`, with `zh-CN` for Simplified Chinese |
+| `labels`                     | Override control text and accessible names from the selected locale                |
+| `className`                  | Additional CSS class on the player root                                            |
+| `style`                      | Inline CSS styles on the player root                                               |
+| `onNextEpisode`              | Shows the next-episode button; pauses and exits fullscreen before calling the host |
+| `ref`                        | `Ref<LibmediaPlayerHandle>` for playback commands                                  |
 
 The player defaults to full container width and a 16:9 ratio. Use `className`
 for responsive layout or `style` for a local override. The fullscreen button uses
@@ -193,6 +193,11 @@ Load preferences in the host before rendering the player. Pass them in
   `{ enabled: true }` to use the engine's default caption track.
   Set `audio: null` for silence. Omit a field to keep the default. Playback
   rates from 0.5 to 2 apply to on-demand sources.
+- For an exact audio requirement, set `audio: { streamIndex, strict: true }`.
+  If that stream is unavailable, playback starts silently and reports a
+  nonfatal track error. This is the replacement for `initialAudio={streamIndex}`.
+  Use `audio: null` in place of `initialAudio={null}`. If both props are
+  supplied, the deprecated prop takes priority for the initial audio selection.
 - Preference events come from the built-in controls. Initial restoration,
   missing tracks, retries, and ref commands do not produce preference events.
 
@@ -200,8 +205,8 @@ Load preferences in the host before rendering the player. Pass them in
 
 | Event                        | What it reports                                                                                                                                                |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `onReady`                    | Source and starting position are ready                                                                                                                         |
-| `onInitialPositionResult`    | Requested and settled position plus `restored`, before `onReady`. Check `restored` before replacing saved progress                                             |
+| `onReady`                    | Media is ready after any initial seek settles. Includes the settled position and, when a starting position was requested, `initialPositionResult`              |
+| `onInitialPositionResult`    | Deprecated. Read `onReady`'s `initialPositionResult`. The legacy callback still fires before `onReady`                                                         |
 | `onPlaybackStateChange`      | Status, effective `playbackRate`, `seeking`, and `buffering`. A seek starts before position updates and clears when it settles                                 |
 | `onTimeUpdate`               | Current position and duration. Updates during playback are generally emitted once a second                                                                     |
 | `onSeeked`                   | Requested and settled positions after a successful seek                                                                                                        |
@@ -213,6 +218,11 @@ Load preferences in the host before rendering the player. Pass them in
 - Time values are in milliseconds. Duration is `null` for live streams or unknown durations.
 - Events include `src` and a `sessionId` for the load attempt. The id changes after `retry()` or a remount, so discard events from a session you replaced.
 - An audio or subtitle value of `null` in `onTrackChange` means that track type has no active output.
+- In `onReady`, `initialPositionResult.requestedPositionMs` is the requested
+  start and `positionMs` is the settled position. Check
+  `initialPositionResult.restored` before replacing saved progress or
+  continuing playback automatically. The result is optional and reports
+  `restored: false` if the initial seek failed.
 
 ### Errors and recovery
 
