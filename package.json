@@ -3,6 +3,10 @@
   "version": "1.4.1",
   "description": "A React player for Matroska built on libmedia AVPlayer, with chapter navigation and audio and subtitle track selection.",
   "license": "LGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qw0er/libmedia-react-player.git"
+  },
   "keywords": [
     "react",
     "video-player",
