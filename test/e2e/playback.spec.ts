@@ -67,6 +67,7 @@ test('plays protected Matroska and seeks when the timeline is clicked', async ({
     .toContainEqual(expect.stringMatching(/^bytes \d+-\d+\/\d+$/))
 
   const timeline = page.locator('.lmp-timeline')
+  await expect(timeline.locator('.lmp-segment-buffer').first()).toBeVisible()
   await timeline.click(await timelinePosition(page, 7000))
   await expectSeek(page, 7000)
   await expect(page.getByTestId('errors')).toHaveText('[]')

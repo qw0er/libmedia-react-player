@@ -75,6 +75,7 @@ export function usePlayback(
     viewport,
     session,
     status === 'playing' && pendingSeek === undefined,
+    (status === 'playing' || status === 'paused') && !busy,
   )
 
   useLayoutEffect(() => {

@@ -1,8 +1,7 @@
 import { type RefObject, useEffect, useState } from 'react'
 
 import type { BundledPlayer } from './bundledPlayer'
-
-type Player = Pick<BundledPlayer, 'currentTime' | 'isMSE'>
+import type { PlaybackSession } from './playback/session'
 
 export interface BufferedRange {
   start: number
@@ -11,6 +10,8 @@ export interface BufferedRange {
 
 const emptyRanges: BufferedRange[] = []
 const sampleInterval = 250
+// The demux worker can publish queue statistics up to 500 ms apart.
+const queueStatsInterval = 500
 const nativeWaitThreshold = 250
 const softwareWaitThreshold = 1750
 const nativeEvents = ['waiting', 'playing', 'progress', 'seeked', 'emptied']
@@ -23,19 +24,56 @@ function readBuffered(element: HTMLMediaElement) {
   }))
 }
 
+function queueSeconds(packets: number, packetsPerSecond: number) {
+  return packets > 0 && packetsPerSecond > 0 ? packets / packetsPerSecond : 0
+}
+
+function estimateBuffered(
+  player: BundledPlayer,
+  duration: number,
+  attachedPictures: ReadonlySet<number>,
+): BufferedRange[] {
+  const start = Number(player.currentTime)
+  if (start < 0 || start >= duration) return emptyRanges
+
+  const stats = player.getStats()
+  const videoId = player.getSelectedVideoStreamId()
+  // Only active audio and motion video constrain the playable estimate.
+  const audioSeconds =
+    player.getSelectedAudioStreamId() === -1
+      ? Infinity
+      : queueSeconds(stats.audioPacketQueueLength, stats.audioEncodeFramerate)
+  const videoSeconds =
+    videoId === -1 || attachedPictures.has(videoId)
+      ? Infinity
+      : queueSeconds(stats.videoPacketQueueLength, stats.videoEncodeFramerate)
+  const seconds = Math.min(audioSeconds, videoSeconds)
+  if (!Number.isFinite(seconds) || seconds <= 0) return emptyRanges
+
+  const end = Math.min(duration, start + Math.round(seconds * 1000))
+  return end > start ? [{ start, end }] : emptyRanges
+}
+
 export function useBuffering(
   viewport: RefObject<HTMLDivElement | null>,
-  session: RefObject<{ player: Player } | null>,
+  session: RefObject<PlaybackSession | null>,
   monitoring: boolean,
+  estimating: boolean,
 ) {
   const [buffered, setBuffered] = useState(emptyRanges)
   const [stalled, setStalled] = useState(false)
 
   useEffect(() => {
     const container = viewport.current
-    const player = session.current?.player
-    if (!container || !player) return
-    if (!monitoring && !player.isMSE()) {
+    const current = session.current
+    if (!container || !current) {
+      setBuffered(emptyRanges)
+      setStalled(false)
+      return
+    }
+    const { player, media } = current
+    const mse = player.isMSE()
+    if (!monitoring && !estimating && !mse) {
       setBuffered(emptyRanges)
       setStalled(false)
       return
@@ -44,14 +82,40 @@ export function useBuffering(
     let lastPosition = player.currentTime
     let lastAdvance = performance.now()
     let waitingSince: number | undefined
+    const estimateAfter = lastAdvance + queueStatsInterval
+    const attachedPictures = new Set(
+      estimating && !mse
+        ? player
+            .getStreams()
+            .filter((stream) => stream.attachedPicture)
+            .map((stream) => stream.id)
+        : [],
+    )
 
     const sample = () => {
+      if (!current.active) {
+        setBuffered(emptyRanges)
+        setStalled(false)
+        return
+      }
       const now = performance.now()
       // The bundled MSE player mounts its media element in this viewport.
-      const element = player.isMSE()
+      const element = mse
         ? container.querySelector<HTMLMediaElement>('video, audio')
         : undefined
-      const ranges = element ? readBuffered(element) : emptyRanges
+      let ranges = emptyRanges
+      if (element) {
+        ranges = readBuffered(element)
+      } else if (
+        !mse &&
+        estimating &&
+        !current.operation &&
+        now >= estimateAfter &&
+        media &&
+        media.duration > 0
+      ) {
+        ranges = estimateBuffered(player, media.duration, attachedPictures)
+      }
       setBuffered((previous) =>
         previous.length === ranges.length &&
         previous.every(
@@ -97,7 +161,7 @@ export function useBuffering(
       sample()
     }
 
-    // Poll buffered ranges as MSE appends can update them between media events.
+    // Queue stats and MSE appends can change between media events.
     const timer = window.setInterval(sample, sampleInterval)
     for (const event of nativeEvents)
       container.addEventListener(event, sample, true)
@@ -113,7 +177,7 @@ export function useBuffering(
         resetAfterVisibilityChange,
       )
     }
-  }, [monitoring, session, viewport])
+  }, [estimating, monitoring, session, viewport])
 
   return { buffered, buffering: monitoring && stalled }
 }
