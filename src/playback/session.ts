@@ -85,7 +85,8 @@ export function startPlaybackSession(
   sessionId: string,
   callbacks: SessionCallbacks,
 ) {
-  const { src, initialAudio, initialPositionMs } = source
+  const { src, initialAudio, initialPositionMs, initialPlaybackPreferences } =
+    source
   const mediaUrl = new URL(src, document.baseURI).href
   const lifetime = new AbortController()
   const { signal } = lifetime
@@ -196,9 +197,14 @@ export function startPlaybackSession(
       ...runtimeOptions,
       container,
       findBestStream(streams, mediaType) {
-        // AVMediaType.Audio. Other stream types use the engine's default.
-        const preferredId = tracks.preferredAudioId
-        if (mediaType === 1 && preferredId !== undefined)
+        // AVMediaType.Audio and AVMediaType.Subtitle.
+        const preferredId =
+          mediaType === 1
+            ? tracks.preferredAudioId
+            : mediaType === 3
+              ? tracks.preferredSubtitleId
+              : undefined
+        if (preferredId !== undefined)
           return streams.find((stream) => stream.id === preferredId)
       },
     })
@@ -245,7 +251,8 @@ export function startPlaybackSession(
               runtimeOptions.audioWorkletUrls,
             ),
           async () => {
-            await load()
+            const media = await load()
+            if (media) callbacks.onReady(playback, media)
           },
         ),
       progress() {
@@ -306,8 +313,12 @@ export function startPlaybackSession(
         () => active && playback.status !== 'error',
         (message) => playback.reportError('track', message, false),
       )
+      if (!active || playback.status === 'error') return
       tracks.setSidecars(sidecars)
-      return bitmapSidecars
+      const media = readMedia(player, AVPlayerSupportedCodecs, bitmapSidecars)
+      playback.media = media
+      tracks.prepareSubtitles(initialPlaybackPreferences?.subtitles)
+      return media
     }
 
     player
@@ -362,10 +373,8 @@ export function startPlaybackSession(
       })
       .on('changed', () => tracks.syncTracks())
 
-    const bitmapSidecars = await load()
-    if (!active || playback.status === 'error') return
-    const media = readMedia(player, AVPlayerSupportedCodecs, bitmapSidecars)
-    playback.media = media
+    const media = await load()
+    if (!media || !active || playback.status !== 'loading') return
     if (initialAudio !== undefined) {
       try {
         await tracks.selectAudio(initialAudio)
@@ -377,8 +386,15 @@ export function startPlaybackSession(
           false,
         )
       }
+    } else {
+      const audio = initialPlaybackPreferences?.audio
+      const stream = audio == null ? audio : tracks.preferredAudioStream(audio)
+      if (stream !== undefined) await tracks.selectAudio(stream, false)
     }
     if (!active || playback.status !== 'loading') return
+    const rate = initialPlaybackPreferences?.playbackRate
+    if (!media.live && rate !== undefined && rate >= 0.5 && rate <= 2)
+      player.setPlaybackRate(rate)
     if (initialPositionMs !== undefined) {
       let restored = initialPositionMs === 0
       const start = seekTarget(media, initialPositionMs)

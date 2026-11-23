@@ -2,6 +2,7 @@ import type { BundledPlayer } from '../bundledPlayer'
 import type {
   ExternalSubtitleTrack,
   LibmediaAudioSelection,
+  LibmediaPlaybackPreferences,
   LibmediaRequestOptions,
 } from '../player-api'
 import { bitmapSidecarFormat } from './bitmap-subtitles'
@@ -19,6 +20,7 @@ export interface PlaybackSource {
   externalSubtitles: readonly ExternalSubtitleTrack[]
   initialPositionMs?: number
   initialAudio?: LibmediaAudioSelection
+  initialPlaybackPreferences?: LibmediaPlaybackPreferences
 }
 
 export async function loadSource(

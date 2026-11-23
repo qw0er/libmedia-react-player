@@ -18,6 +18,7 @@ import type { TrackSelection } from './playback/tracks'
 import type {
   ExternalSubtitleTrack,
   LibmediaAudioSelection,
+  LibmediaPlaybackPreferences,
   LibmediaPlaybackSnapshot,
   LibmediaPlaybackStatus,
   LibmediaPlayerEvents,
@@ -42,11 +43,14 @@ export function usePlayback(
   externalSubtitles: readonly ExternalSubtitleTrack[],
   initialPositionMs: number | undefined,
   initialAudio: LibmediaAudioSelection | undefined,
+  initialPlaybackPreferences: LibmediaPlaybackPreferences | undefined,
   events: LibmediaPlayerEvents,
 ) {
   const viewport = useRef<HTMLDivElement>(null)
   const session = useRef<PlaybackSession | null>(null)
   const listeners = useRef(events)
+  const [initialPreferences] = useState(initialPlaybackPreferences)
+  const preferenceChanges = useRef<LibmediaPlaybackPreferences>({})
   const stalled = useRef(false)
   const latest = useRef({ position: 0, loaded: false })
   const sessionId = useRef('')
@@ -112,7 +116,14 @@ export function usePlayback(
         mediaRequest: activeRequest,
         externalSubtitles,
         initialPositionMs: activePosition,
-        initialAudio,
+        initialAudio:
+          preferenceChanges.current.audio === undefined
+            ? initialAudio
+            : undefined,
+        initialPlaybackPreferences: {
+          ...initialPreferences,
+          ...preferenceChanges.current,
+        },
       },
       attemptId,
       {
@@ -144,6 +155,7 @@ export function usePlayback(
     externalSubtitles,
     activePosition,
     initialAudio,
+    initialPreferences,
     restart,
   ])
 
@@ -209,6 +221,35 @@ export function usePlayback(
     session.current?.tracks.setVolume(level)
   }
 
+  function reportPreferenceChange(
+    current: PlaybackSession,
+    changes: LibmediaPlaybackPreferences,
+  ) {
+    if (!current.active || current.status === 'error') return
+    preferenceChanges.current = { ...preferenceChanges.current, ...changes }
+    const { src, sessionId } = current.progress()
+    current.emit((events) =>
+      events.onPlaybackPreferenceChange?.({ src, sessionId, changes }),
+    )
+  }
+
+  function selectAudio(selection: LibmediaAudioSelection) {
+    const current = session.current
+    if (!current) return
+    const track = current.media?.audio.find(
+      (candidate) => candidate.streamIndex === selection,
+    )
+    const audio =
+      selection === null
+        ? null
+        : track && { streamIndex: track.streamIndex, language: track.language }
+    if (audio === undefined) return
+    void controls
+      .selectAudio(selection)
+      .then(() => reportPreferenceChange(current, { audio }))
+      .catch(() => {})
+  }
+
   return {
     viewport,
     controls,
@@ -240,29 +281,47 @@ export function usePlayback(
     },
     changeVolume,
     changeCaptions(enabled: boolean) {
+      const current = session.current
+      if (!current?.active || current.status === 'error') return
       // Keep libmedia's decoder and cue queue running so toggling visibility
       // never seeks the subtitle stream or resets a cue already in progress.
-      session.current?.tracks.syncTracks(enabled)
+      current.tracks.setCaptions(enabled)
+      reportPreferenceChange(current, {
+        subtitles: current.tracks.subtitlePreference(),
+      })
     },
+    selectAudio,
     selectTrack(kind: 'audio' | 'subtitles', id: number) {
+      const current = session.current
+      if (!current) return
       if (kind === 'audio') {
-        const track = session.current?.media?.audio.find(
+        const track = current.media?.audio.find(
           (candidate) => candidate.id === id,
         )
-        if (track) void controls.selectAudio(track.streamIndex).catch(() => {})
+        if (track) selectAudio(track.streamIndex)
         return
       }
-      void commands.selectSubtitle(id).catch(() => {})
+      void commands
+        .selectSubtitle(id)
+        .then(() =>
+          reportPreferenceChange(current, {
+            subtitles: current.tracks.subtitlePreference(),
+          }),
+        )
+        .catch(() => {})
     },
     toggleMute: () =>
       changeVolume(volume > 0 ? 0 : (session.current?.tracks.lastVolume ?? 1)),
     changeRate(value: number) {
       const current = session.current
-      const player = current?.player
-      if (!player || player.isLive()) return
+      if (!current?.active || current.status === 'error') return
+      const { player } = current
+      if (player.isLive()) return
       player.setPlaybackRate(value)
-      setRate(player.getPlaybackRate())
+      const playbackRate = player.getPlaybackRate()
+      setRate(playbackRate)
       current.publishState()
+      reportPreferenceChange(current, { playbackRate })
     },
     changeDelay(value: number) {
       session.current?.tracks.setSubtitleDelay(value)

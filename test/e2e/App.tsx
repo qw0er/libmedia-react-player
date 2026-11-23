@@ -1,16 +1,31 @@
 import {
+  type ExternalSubtitleTrack,
+  type LibmediaPlaybackPreferenceChangeEvent,
+  type LibmediaPlaybackPreferences,
   type LibmediaPlaybackProgress,
   type LibmediaPlaybackState,
   LibmediaPlayer,
   type LibmediaPlayerError,
   type LibmediaPlayerHandle,
   type LibmediaSeekEvent,
+  type LibmediaTrackChangeEvent,
 } from 'libmedia-react-player'
 import { useRef, useState } from 'react'
 
 const validRequest = { headers: { Authorization: 'Bearer fixture-token' } }
 const invalidRequest = { headers: { Authorization: 'Bearer expired-token' } }
-const expired = new URLSearchParams(location.search).has('expired')
+const params = new URLSearchParams(location.search)
+const expired = params.has('expired')
+const testPreferences = params.has('preferences')
+const sidecar: ExternalSubtitleTrack = {
+  id: 'fixture-french',
+  label: 'French sidecar',
+  language: 'fra',
+  content: new Blob([
+    '1\n00:00:00,500 --> 00:00:04,000\nFixture sidecar cue\n',
+  ]),
+  format: 'srt',
+}
 
 export function App() {
   const player = useRef<LibmediaPlayerHandle>(null)
@@ -18,18 +33,51 @@ export function App() {
   const [progress, setProgress] = useState<LibmediaPlaybackProgress>()
   const [seek, setSeek] = useState<LibmediaSeekEvent>()
   const [errors, setErrors] = useState<LibmediaPlayerError[]>([])
+  const [tracks, setTracks] = useState<LibmediaTrackChangeEvent>()
+  const [changes, setChanges] = useState<
+    LibmediaPlaybackPreferenceChangeEvent[]
+  >([])
+  const [nextSource, setNextSource] = useState(false)
+  const preferences: LibmediaPlaybackPreferences | undefined = testPreferences
+    ? nextSource
+      ? {
+          audio: null,
+          subtitles: {
+            enabled: true,
+            externalSubtitleId: 'missing',
+            language: 'ENG',
+          },
+        }
+      : {
+          audio: { streamIndex: 999, language: 'jpn' },
+          subtitles: {
+            enabled: true,
+            externalSubtitleId: sidecar.id,
+            language: 'eng',
+          },
+          playbackRate: 1.25,
+          ...Object.assign({}, ...changes.map((event) => event.changes)),
+        }
+    : undefined
 
   return (
     <>
       <LibmediaPlayer
         ref={player}
-        src="/media"
+        src={nextSource ? '/media?next' : '/media'}
         sourceFormat="mkv"
         mediaRequest={expired ? invalidRequest : validRequest}
+        externalSubtitles={testPreferences ? [sidecar] : undefined}
+        initialPlaybackPreferences={preferences}
+        initialAudio={nextSource ? 1 : undefined}
         style={{ maxWidth: 720 }}
         onPlaybackStateChange={setState}
         onTimeUpdate={setProgress}
         onSeeked={setSeek}
+        onTrackChange={setTracks}
+        onPlaybackPreferenceChange={(event) =>
+          setChanges((previous) => [...previous, event])
+        }
         onError={(error) => setErrors((previous) => [...previous, error])}
       />
       {expired && (
@@ -39,6 +87,18 @@ export function App() {
         >
           Retry with refreshed credentials
         </button>
+      )}
+      {testPreferences && (
+        <>
+          <button type="button" onClick={() => player.current?.retry()}>
+            Retry source
+          </button>
+          <button type="button" onClick={() => setNextSource(true)}>
+            Load next source
+          </button>
+          <output data-testid="tracks">{JSON.stringify(tracks)}</output>
+          <output data-testid="preferences">{JSON.stringify(changes)}</output>
+        </>
       )}
       <output data-testid="state">{JSON.stringify(state)}</output>
       <output data-testid="progress">{JSON.stringify(progress)}</output>

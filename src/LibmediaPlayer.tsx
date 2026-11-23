@@ -25,11 +25,14 @@ import { usePlayback } from './usePlayback'
 export type {
   BitmapSubtitleFormat,
   ExternalSubtitleTrack,
+  LibmediaAudioPreference,
   LibmediaAudioSelection,
   LibmediaAudioTrack,
   LibmediaControlLabels,
   LibmediaErrorReason,
   LibmediaInitialPositionResult,
+  LibmediaPlaybackPreferenceChangeEvent,
+  LibmediaPlaybackPreferences,
   LibmediaPlaybackProgress,
   LibmediaPlaybackSnapshot,
   LibmediaPlaybackState,
@@ -42,6 +45,7 @@ export type {
   LibmediaRetryOptions,
   LibmediaSeekEvent,
   LibmediaSessionEvent,
+  LibmediaSubtitlePreference,
   LibmediaTrack,
   LibmediaTrackChangeEvent,
 } from './player-api'
@@ -63,6 +67,7 @@ export function LibmediaPlayer({
     src,
     format,
     externalSubtitles.map((track) => [
+      track.id,
       track.src,
       track.format,
       track.label,
@@ -114,6 +119,7 @@ function Playback({
   externalSubtitles = [],
   initialPositionMs,
   initialAudio,
+  initialPlaybackPreferences,
   className,
   style,
   onNextEpisode,
@@ -139,6 +145,7 @@ function Playback({
     subtitleSources,
     initialPosition,
     audio,
+    initialPlaybackPreferences,
     events,
   )
   const { controls } = playback

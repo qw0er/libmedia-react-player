@@ -1,9 +1,11 @@
 import { expect, type Page, test } from '@playwright/test'
 import type {
+  LibmediaPlaybackPreferenceChangeEvent,
   LibmediaPlaybackProgress,
   LibmediaPlaybackState,
   LibmediaPlayerError,
   LibmediaSeekEvent,
+  LibmediaTrackChangeEvent,
 } from 'libmedia-react-player'
 
 async function readOutput<T>(page: Page, name: string): Promise<T | undefined> {
@@ -14,6 +16,96 @@ async function readOutput<T>(page: Page, name: string): Promise<T | undefined> {
 function playbackState(page: Page) {
   return readOutput<LibmediaPlaybackState>(page, 'state')
 }
+
+test('restores playback preferences and reports only choices made in the controls', async ({
+  page,
+}) => {
+  await page.goto('/test/e2e/?preferences')
+  await expect
+    .poll(() => playbackState(page))
+    .toMatchObject({ status: 'ready', playbackRate: 1.25 })
+  const sessionId = (await playbackState(page))?.sessionId
+  const tracks = () => readOutput<LibmediaTrackChangeEvent>(page, 'tracks')
+  const preferences = () =>
+    readOutput<LibmediaPlaybackPreferenceChangeEvent[]>(page, 'preferences')
+
+  await page.locator('.lmp-center').click()
+  await expect.poll(tracks).toMatchObject({
+    sessionId,
+    audio: { streamIndex: 1 },
+    subtitle: { language: 'fra' },
+  })
+  await expect(
+    page.getByText('Fixture sidecar cue', { exact: true }),
+  ).toBeVisible()
+  expect(await preferences()).toEqual([])
+  await page.locator('.lmp-surface').click()
+
+  const captions = page.getByRole('button', { name: 'Subtitles', exact: true })
+  await captions.click()
+  await captions.click()
+  await captions.click()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  const panel = page.locator('.lmp-panel')
+  await panel.getByRole('button', { name: /^Audio/ }).click()
+  await panel.getByRole('button', { name: 'Off', exact: true }).click()
+  await expect.poll(tracks).toMatchObject({ audio: null })
+  await panel.getByRole('button', { name: 'Back to settings' }).click()
+  await panel.getByRole('button', { name: /^Playback speed/i }).click()
+  await panel.getByRole('button', { name: '1.5×', exact: true }).click()
+  await expect.poll(preferences).toEqual(
+    [
+      { subtitles: { enabled: false } },
+      {
+        subtitles: {
+          enabled: true,
+          externalSubtitleId: 'fixture-french',
+          language: 'fra',
+        },
+      },
+      { subtitles: { enabled: false } },
+      { audio: null },
+      { playbackRate: 1.5 },
+    ].map((changes) => ({ src: '/media', sessionId, changes })),
+  )
+  await expect
+    .poll(() => playbackState(page))
+    .toMatchObject({
+      sessionId,
+      playbackRate: 1.5,
+    })
+
+  await page.getByRole('button', { name: 'Retry source' }).click()
+  await expect
+    .poll(() => playbackState(page))
+    .toMatchObject({ status: 'ready', playbackRate: 1.5 })
+  const retryId = (await playbackState(page))?.sessionId
+  expect(retryId).not.toBe(sessionId)
+  await expect(page.locator('.libmedia-player')).toHaveAttribute(
+    'data-captions',
+    'false',
+  )
+  await page.locator('.lmp-center').click()
+  await expect.poll(tracks).toMatchObject({
+    sessionId: retryId,
+    audio: null,
+    subtitle: null,
+  })
+  expect(await preferences()).toHaveLength(5)
+
+  await page.getByRole('button', { name: 'Load next source' }).click()
+  await expect
+    .poll(() => playbackState(page))
+    .toMatchObject({ src: '/media?next', status: 'ready', playbackRate: 1 })
+  await page.locator('.lmp-center').click()
+  await expect.poll(tracks).toMatchObject({
+    src: '/media?next',
+    audio: { streamIndex: 1 },
+    subtitle: { language: 'eng' },
+  })
+  expect(await preferences()).toHaveLength(5)
+  await expect(page.getByTestId('errors')).toHaveText('[]')
+})
 
 async function expectSeek(page: Page, targetMs: number) {
   await expect

@@ -173,9 +173,7 @@ export function TrackList({
           label={labels.off}
           selected={!selectedAudio}
           busy={playback.busy}
-          onSelect={() =>
-            void playback.controls.selectAudio(null).catch(() => {})
-          }
+          onSelect={() => playback.selectAudio(null)}
         />
       )}
       {tracks.map((track) => (

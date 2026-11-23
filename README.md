@@ -103,19 +103,20 @@ Use `sourceFormat` when the URL has no file extension. The player applies `media
 
 ### Props
 
-| Prop                | Purpose                                                                            |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| `src`               | Required media URL                                                                 |
-| `sourceFormat`      | Extension hint such as `mp4`, `mkv`, or `webm`                                     |
-| `mediaRequest`      | Optional fetch headers and credentials mode                                        |
-| `externalSubtitles` | Subtitle tracks supplied by the host                                               |
-| `initialPositionMs` | Resume position applied when the source loads                                      |
-| `initialAudio`      | File stream index. Pass `null` for silence or omit for the engine default          |
-| `labels`            | Override control text and accessible names, including `nextEpisode`                |
-| `className`         | Additional CSS class on the player root                                            |
-| `style`             | Inline CSS styles on the player root                                               |
-| `onNextEpisode`     | Shows the next-episode button; pauses and exits fullscreen before calling the host |
-| `ref`               | `Ref<LibmediaPlayerHandle>` for playback commands                                  |
+| Prop                         | Purpose                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| `src`                        | Required media URL                                                                              |
+| `sourceFormat`               | Extension hint such as `mp4`, `mkv`, or `webm`                                                  |
+| `mediaRequest`               | Optional fetch headers and credentials mode                                                     |
+| `externalSubtitles`          | Subtitle tracks supplied by the host                                                            |
+| `initialPositionMs`          | Resume position applied when the source loads                                                   |
+| `initialAudio`               | Exact file stream index or `null` for silence. Takes priority over the initial audio preference |
+| `initialPlaybackPreferences` | Saved audio, subtitle, and speed preferences applied when a source loads                        |
+| `labels`                     | Override control text and accessible names, including `nextEpisode`                             |
+| `className`                  | Additional CSS class on the player root                                                         |
+| `style`                      | Inline CSS styles on the player root                                                            |
+| `onNextEpisode`              | Shows the next-episode button; pauses and exits fullscreen before calling the host              |
+| `ref`                        | `Ref<LibmediaPlayerHandle>` for playback commands                                               |
 
 The player defaults to full container width and a 16:9 ratio. Use `className`
 for responsive layout or `style` for a local override. The fullscreen button uses
@@ -132,18 +133,65 @@ episode starts windowed.
 ;<LibmediaPlayer src={url} style={{ aspectRatio: '4 / 3' }} />
 ```
 
+### Playback preferences
+
+Load preferences in the host before rendering the player. Pass them in
+`initialPlaybackPreferences` and merge the `changes` from
+`onPlaybackPreferenceChange` into your saved settings:
+
+```tsx
+;<LibmediaPlayer
+  src={episodeUrl}
+  initialPlaybackPreferences={{
+    playbackRate: account.playbackRate,
+    audio: series.audio,
+    subtitles: series.subtitles,
+  }}
+  onPlaybackPreferenceChange={({ changes }) => {
+    if (changes.playbackRate !== undefined)
+      saveAccountSpeed(changes.playbackRate)
+    if (changes.audio !== undefined)
+      saveSeriesAudio(
+        changes.audio === null ? null : { language: changes.audio.language },
+      )
+    if (changes.subtitles !== undefined)
+      saveSeriesSubtitles(
+        changes.subtitles.enabled
+          ? { enabled: true, language: changes.subtitles.language }
+          : { enabled: false },
+      )
+  }}
+/>
+```
+
+- The player samples the initial preferences on source load. Saving them and
+  passing a new object for the current source leaves playback running. A
+  same-source `retry()` restores the choices already made in the controls.
+- Use language tags for preferences shared across files. Matching ignores case
+  and prefers a track marked default when several tracks match. Use a file's
+  `streamIndex` for an exact embedded selection, or supply a unique, stable
+  `id` on an external subtitle and save its `externalSubtitleId`. A missing
+  exact selection falls back to the preferred language, then the engine default.
+- Set `subtitles: { enabled: false }` to hide captions, or
+  `{ enabled: true }` to use the engine's default caption track.
+  Set `audio: null` for silence. Omit a field to keep the default. Playback
+  rates from 0.5 to 2 apply to on-demand sources.
+- Preference events come from the built-in controls. Initial restoration,
+  missing tracks, retries, and ref commands do not produce preference events.
+
 ### Events
 
-| Event                     | What it reports                                                                                                                                                |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `onReady`                 | Source and starting position are ready                                                                                                                         |
-| `onInitialPositionResult` | Requested and settled position plus `restored`, before `onReady`. Check `restored` before replacing saved progress                                             |
-| `onPlaybackStateChange`   | Status, effective `playbackRate`, `seeking`, and `buffering`. A seek starts before position updates and clears when it settles                                 |
-| `onTimeUpdate`            | Current position and duration. Updates during playback are generally emitted once a second                                                                     |
-| `onSeeked`                | Requested and settled positions after a successful seek                                                                                                        |
-| `onTrackChange`           | Initial active tracks on playback start, then changes. Audio includes the file's `streamIndex`, which can be matched to FFprobe's `stream.index` for that file |
-| `onEnded`                 | Natural playback completion                                                                                                                                    |
-| `onError`                 | Failed operation, display-safe message, stable `reason`, HTTP status when one was observed, and whether the error is fatal                                     |
+| Event                        | What it reports                                                                                                                                                |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onReady`                    | Source and starting position are ready                                                                                                                         |
+| `onInitialPositionResult`    | Requested and settled position plus `restored`, before `onReady`. Check `restored` before replacing saved progress                                             |
+| `onPlaybackStateChange`      | Status, effective `playbackRate`, `seeking`, and `buffering`. A seek starts before position updates and clears when it settles                                 |
+| `onTimeUpdate`               | Current position and duration. Updates during playback are generally emitted once a second                                                                     |
+| `onSeeked`                   | Requested and settled positions after a successful seek                                                                                                        |
+| `onTrackChange`              | Initial active tracks on playback start, then changes. Audio includes the file's `streamIndex`, which can be matched to FFprobe's `stream.index` for that file |
+| `onPlaybackPreferenceChange` | The changed preference from a successful choice in the built-in controls, with the source and session ID                                                       |
+| `onEnded`                    | Natural playback completion                                                                                                                                    |
+| `onError`                    | Failed operation, display-safe message, stable `reason`, HTTP status when one was observed, and whether the error is fatal                                     |
 
 - Time values are in milliseconds. Duration is `null` for live streams or unknown durations.
 - Events include `src` and a `sessionId` for the load attempt. The id changes after `retry()` or a remount, so discard events from a session you replaced.

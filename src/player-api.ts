@@ -1,6 +1,8 @@
 import type { CSSProperties, Ref } from 'react'
 
 interface ExternalSubtitleOptions {
+  /** Host-provided identifier for restoring this sidecar across loads. */
+  id?: string
   label?: string
   language?: string
   /** Positive values show cues later. This is added to the player's subtitle delay. */
@@ -93,6 +95,40 @@ export interface LibmediaAudioTrack extends LibmediaTrack {
 /** Select a file stream index, or pass null for silence at the current volume. */
 export type LibmediaAudioSelection = number | null
 
+export interface LibmediaAudioPreference {
+  /** Exact selection within the same media file. */
+  streamIndex?: number
+  /** Fall back to this language when the exact selection is unavailable. */
+  language?: string
+}
+
+export type LibmediaSubtitlePreference =
+  | { enabled: false }
+  | {
+      enabled: true
+      /** Exact selection for an external subtitle with a host-provided ID. */
+      externalSubtitleId?: string
+      /** Exact selection for an embedded subtitle within the same media file. */
+      streamIndex?: number
+      /** Fall back to this language when the exact selection is unavailable. */
+      language?: string
+    }
+
+export interface LibmediaPlaybackPreferences {
+  /** Pass null for silence. Omit to use the engine's default track. */
+  audio?: LibmediaAudioPreference | null
+  subtitles?: LibmediaSubtitlePreference
+  /** Playback speed from 0.5 to 2. Live sources ignore this setting. */
+  playbackRate?: number
+}
+
+export interface LibmediaPlaybackPreferenceChangeEvent
+  extends LibmediaSessionEvent {
+  src: string
+  /** Merge these fields into the preferences saved by the host. */
+  changes: LibmediaPlaybackPreferences
+}
+
 export interface LibmediaTrackChangeEvent extends LibmediaSessionEvent {
   src: string
   audio: LibmediaAudioTrack | null
@@ -169,6 +205,10 @@ export interface LibmediaPlayerEvents {
   onInitialPositionResult?: (event: LibmediaInitialPositionResult) => void
   /** Reports the initial selection when playback starts and subsequent changes. */
   onTrackChange?: (event: LibmediaTrackChangeEvent) => void
+  /** Reports successful choices made through the built-in controls. */
+  onPlaybackPreferenceChange?: (
+    event: LibmediaPlaybackPreferenceChangeEvent,
+  ) => void
   onEnded?: (event: LibmediaPlaybackProgress) => void
   onError?: (event: LibmediaPlayerError) => void
 }
@@ -183,8 +223,10 @@ export interface LibmediaPlayerProps extends LibmediaPlayerEvents {
   externalSubtitles?: readonly ExternalSubtitleTrack[]
   /** Applied once when the source loads. Use seekTo to change position later. */
   initialPositionMs?: number
-  /** Applied once per source. Omit to use AVPlayer's default selection. */
+  /** Exact audio selection. Takes priority over the initial audio preference. */
   initialAudio?: LibmediaAudioSelection
+  /** Sampled when a source loads. Updating this prop does not reload playback. */
+  initialPlaybackPreferences?: LibmediaPlaybackPreferences
   labels?: Partial<LibmediaControlLabels>
   /** Additional CSS class for the player root. */
   className?: string

@@ -1,9 +1,11 @@
 import type { BundledPlayer } from '../bundledPlayer'
 import type {
   ExternalSubtitleTrack,
+  LibmediaAudioPreference,
   LibmediaAudioSelection,
   LibmediaPlaybackProgress,
   LibmediaPlaybackStatus,
+  LibmediaSubtitlePreference,
   LibmediaTrackChangeEvent,
 } from '../player-api'
 import {
@@ -69,15 +71,20 @@ interface TrackCallbacks {
 }
 
 const unavailableAudioMessage = 'The requested audio stream is unavailable.'
+// libmedia's AVDisposition.DEFAULT.
+const defaultDisposition = 1
 
 export function createPlaybackTracks(
   src: string,
   getPlayback: () => TrackPlayback,
   callbacks: TrackCallbacks,
 ) {
-  let preferredAudioId: number | undefined
+  let preferredAudioIndex: number | undefined
+  let requirePreferredAudio = true
   let verifiedAudio = false
   let audioSilent = false
+  let preferredSubtitleId: number | undefined
+  let captions = true
   let userVolume = 1
   let lastVolume = 1
   let userSubtitleDelay = 0
@@ -94,14 +101,17 @@ export function createPlaybackTracks(
     if (level > 0) lastVolume = level
     callbacks.setVolume(level)
     getPlayback().player.setVolume(
-      audioSilent || (!verifiedAudio && preferredAudioId !== undefined)
+      audioSilent || (!verifiedAudio && preferredAudioIndex !== undefined)
         ? 0
         : level,
       true,
     )
   }
 
-  async function selectAudio(requested: LibmediaAudioSelection) {
+  async function selectAudio(
+    requested: LibmediaAudioSelection,
+    required = true,
+  ) {
     const playback = getPlayback()
     const { player } = playback
     const track = playback.media?.audio.find(
@@ -109,7 +119,8 @@ export function createPlaybackTracks(
     )
     if (requested !== null && !track) throw new Error(unavailableAudioMessage)
     if (playback.status === 'ready' || playback.status === 'loading') {
-      preferredAudioId = track?.id
+      preferredAudioIndex = track?.streamIndex
+      requirePreferredAudio = required
       verifiedAudio = false
     } else if (track && player.getSelectedAudioStreamId() !== track.id) {
       await player.selectAudio(track.id)
@@ -121,14 +132,85 @@ export function createPlaybackTracks(
     syncTracks()
   }
 
+  function preferredAudioId() {
+    return getPlayback().media?.audio.find(
+      (track) => track.streamIndex === preferredAudioIndex,
+    )?.id
+  }
+
   function checkAudioSelection() {
-    if (verifiedAudio || preferredAudioId === undefined) return
+    if (verifiedAudio || preferredAudioIndex === undefined) return
     verifiedAudio = true
-    if (getPlayback().player.getSelectedAudioStreamId() !== preferredAudioId) {
+    if (
+      requirePreferredAudio &&
+      getPlayback().player.getSelectedAudioStreamId() !== preferredAudioId()
+    ) {
       audioSilent = true
       callbacks.onError(unavailableAudioMessage)
     }
     setVolume(userVolume)
+  }
+
+  function preferredLanguageTrack(
+    tracks: MediaInfo['audio'],
+    language: string | undefined,
+  ) {
+    const tag = language?.trim().toLowerCase()
+    if (!tag) return
+    const matches = tracks.filter(
+      (track) => track.language?.toLowerCase() === tag,
+    )
+    if (matches.length < 2) return matches[0]
+    const defaults = new Set(
+      getPlayback()
+        .player.getStreams()
+        .filter((stream) => stream.disposition & defaultDisposition)
+        .map((stream) => stream.id),
+    )
+    return matches.find((track) => defaults.has(track.id)) ?? matches[0]
+  }
+
+  function preferredAudioStream(preference: LibmediaAudioPreference) {
+    const audio = getPlayback().media?.audio ?? []
+    const track =
+      audio.find((track) => track.streamIndex === preference.streamIndex) ??
+      preferredLanguageTrack(audio, preference.language)
+    return track?.streamIndex
+  }
+
+  function prepareSubtitles(preference?: LibmediaSubtitlePreference) {
+    selection = undefined
+    captions = preference?.enabled ?? true
+    callbacks.setTracks({ captions })
+    const subtitles = getPlayback().media?.subtitles ?? []
+    const track = preference?.enabled
+      ? (subtitles.find((track) =>
+          preference.externalSubtitleId
+            ? sidecars.get(track.id)?.id === preference.externalSubtitleId
+            : !sidecars.has(track.id) &&
+              track.streamIndex === preference.streamIndex,
+        ) ?? preferredLanguageTrack(subtitles, preference.language))
+      : undefined
+    const bitmap = track && bitmapFormat(track.id)
+    selectedBitmapId = bitmap ? track.id : undefined
+    preferredSubtitleId = bitmap ? undefined : track?.id
+  }
+
+  function subtitlePreference(): LibmediaSubtitlePreference {
+    if (!captions) return { enabled: false }
+    const track = selection?.selectedSubtitle
+    if (!track) return { enabled: true }
+    const sidecar = sidecars.get(track.id)
+    const identity = sidecar
+      ? sidecar.id
+        ? { externalSubtitleId: sidecar.id }
+        : {}
+      : { streamIndex: track.streamIndex }
+    return {
+      enabled: true,
+      ...identity,
+      ...(track.language ? { language: track.language } : {}),
+    }
   }
 
   function setSubtitleDelay(value: number) {
@@ -227,10 +309,15 @@ export function createPlaybackTracks(
       if (id !== player.getSelectedSubtitleStreamId()) throw new Error()
       selectedBitmapId = undefined
     }
-    syncTracks(true)
+    setCaptions(true)
   }
 
-  function syncTracks(captions = selection?.captions ?? true) {
+  function setCaptions(enabled: boolean) {
+    captions = enabled
+    syncTracks()
+  }
+
+  function syncTracks() {
     const playback = getPlayback()
     if (
       !playback.active ||
@@ -238,7 +325,7 @@ export function createPlaybackTracks(
       !playback.media ||
       playback.status === 'loading' ||
       playback.status === 'ready' ||
-      (!verifiedAudio && preferredAudioId !== undefined)
+      (!verifiedAudio && preferredAudioIndex !== undefined)
     )
       return
 
@@ -328,7 +415,10 @@ export function createPlaybackTracks(
 
   return {
     get preferredAudioId() {
-      return preferredAudioId
+      return preferredAudioId()
+    },
+    get preferredSubtitleId() {
+      return preferredSubtitleId
     },
     get lastVolume() {
       return lastVolume
@@ -342,6 +432,10 @@ export function createPlaybackTracks(
     setVolume,
     selectAudio,
     selectSubtitle,
+    preferredAudioStream,
+    prepareSubtitles,
+    setCaptions,
+    subtitlePreference,
     checkAudioSelection,
     setSubtitleDelay,
     subtitleClock,
