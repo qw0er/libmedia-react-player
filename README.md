@@ -2,6 +2,8 @@
 
 A multi-format React media player with responsive controls, chapter navigation, audio and subtitle track selection, and a bundled WebAssembly SIMD decoding fallback. Built on the libmedia AVPlayer fork pinned by the Git submodule.
 
+See the [changelog](CHANGELOG.md) for release history.
+
 ## Quick start
 
 ```sh
