@@ -3,6 +3,17 @@
 All notable changes to libmedia-react-player are documented here. Release dates
 and changes are based on the corresponding Git tags and commits.
 
+## [1.6.0] - 2026-11-26
+
+### Added
+
+- Added a **Window fullscreen** button that fills the browser's content area
+  while keeping the browser toolbar visible. The existing **Fullscreen** button
+  and **F** shortcut still use native fullscreen where supported. You can switch
+  directly between the two modes.
+- Added English and Simplified Chinese labels for the new button. Hosts can
+  override them with `labels.windowFullscreen` and `labels.exitWindowFullscreen`.
+
 ## [1.5.1] - 2026-11-26
 
 ### Fixed
@@ -115,6 +126,7 @@ and changes are based on the corresponding Git tags and commits.
   subtitles, a timeline, loading and buffering indicators, and keyboard controls.
 - Added playback commands and events for host applications.
 
+[1.6.0]: https://github.com/qw0er/libmedia-react-player/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/qw0er/libmedia-react-player/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/qw0er/libmedia-react-player/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/qw0er/libmedia-react-player/compare/v1.4.1...v1.4.2
