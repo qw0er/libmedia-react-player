@@ -3,6 +3,7 @@
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -430,4 +431,108 @@ it('shows prepared media details and restores focus when leaving the settings pa
   await user.keyboard('{Escape}')
   expect(document.activeElement).toBe(settingsButton)
   expect(settingsButton.getAttribute('aria-expanded')).toBe('false')
+})
+
+it('starts the auto-hide timer whenever controls are released during playback', async () => {
+  const ref = createRef<LibmediaPlayerHandle>()
+  const { rerender } = render(
+    <>
+      <LibmediaPlayer ref={ref} src={source} />
+      <button type="button">Outside player</button>
+    </>,
+  )
+  const player = await readyPlayer()
+  vi.useFakeTimers()
+  try {
+    await act(async () => {
+      await ref.current?.play()
+    })
+    expect(player.dataset.status).toBe('playing')
+    expect(player.dataset.visible).toBe('true')
+
+    act(() => {
+      vi.advanceTimersByTime(2599)
+    })
+    expect(player.dataset.visible).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(player.dataset.visible).toBe('false')
+
+    // Mouse movement reveals controls and resets the 2600ms timer.
+    fireEvent.pointerMove(player, { pointerType: 'mouse' })
+    expect(player.dataset.visible).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
+    fireEvent.pointerMove(player, { pointerType: 'mouse' })
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
+    expect(player.dataset.visible).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(600)
+    })
+    expect(player.dataset.visible).toBe('false')
+
+    // Pausing reveals controls; programmatic resume starts a fresh timer.
+    await act(async () => {
+      await ref.current?.pause()
+    })
+    expect(player.dataset.visible).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    expect(player.dataset.visible).toBe('true')
+    await act(async () => {
+      await ref.current?.play()
+    })
+    expect(player.dataset.visible).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(2600)
+    })
+    expect(player.dataset.visible).toBe('false')
+
+    // Opening a panel holds controls open; closing via blur starts a fresh timer.
+    fireEvent.click(within(player).getByRole('button', { name: 'Settings' }))
+    expect(player.dataset.panelOpen).toBe('true')
+    expect(player.dataset.visible).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    expect(player.dataset.visible).toBe('true')
+    fireEvent.blur(player, {
+      relatedTarget: screen.getByRole('button', { name: 'Outside player' }),
+    })
+    expect(player.dataset.panelOpen).toBe('false')
+    expect(player.dataset.visible).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(2600)
+    })
+    expect(player.dataset.visible).toBe('false')
+  } finally {
+    vi.useRealTimers()
+  }
+
+  // Changing the source remounts playback; programmatic play still auto-hides.
+  rerender(
+    <>
+      <LibmediaPlayer ref={ref} src="/media?next" />
+      <button type="button">Outside player</button>
+    </>,
+  )
+  const nextPlayer = await readyPlayer()
+  vi.useFakeTimers()
+  try {
+    await act(async () => {
+      await ref.current?.play()
+    })
+    expect(nextPlayer.dataset.visible).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(2600)
+    })
+    expect(nextPlayer.dataset.visible).toBe('false')
+  } finally {
+    vi.useRealTimers()
+  }
 })

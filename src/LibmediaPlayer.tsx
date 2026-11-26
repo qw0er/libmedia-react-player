@@ -219,7 +219,9 @@ function Playback({
   const playing = status === 'playing'
   const loaded = media && status !== 'error'
   if (status === 'error' && pageFullscreen) setPageFullscreen(false)
-  const visible = !playing || !idle || panelOpen || scrub !== undefined
+  const holdControls = !playing || panelOpen || scrub !== undefined
+  if (holdControls && idle) setIdle(false)
+  const visible = holdControls || !idle
   const buffering = playback.buffering && scrub === undefined
 
   useEffect(() => {
@@ -256,12 +258,30 @@ function Playback({
     }
   }, [panelOpen])
 
-  useEffect(() => () => window.clearTimeout(hideTimer.current), [])
+  useEffect(() => {
+    window.clearTimeout(hideTimer.current)
+    hideTimer.current = undefined
+    if (holdControls || idle) return
+    hideTimer.current = window.setTimeout(() => {
+      hideTimer.current = undefined
+      setIdle(true)
+    }, 2600)
+    return () => {
+      window.clearTimeout(hideTimer.current)
+      hideTimer.current = undefined
+    }
+  }, [holdControls, idle])
 
   function revealControls() {
     setIdle(false)
     window.clearTimeout(hideTimer.current)
-    hideTimer.current = window.setTimeout(() => setIdle(true), 2600)
+    hideTimer.current = undefined
+    if (!holdControls) {
+      hideTimer.current = window.setTimeout(() => {
+        hideTimer.current = undefined
+        setIdle(true)
+      }, 2600)
+    }
   }
 
   function closePanel() {
