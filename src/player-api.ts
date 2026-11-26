@@ -296,6 +296,8 @@ export interface LibmediaControlLabels {
   webCodecsPreferSoftware?: string
   fullscreen: string
   exitFullscreen: string
+  windowFullscreen?: string
+  exitWindowFullscreen?: string
   audio: string
   playbackSpeed: string
   chapters: string

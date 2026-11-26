@@ -1,8 +1,10 @@
 import {
+  AppWindow,
   Captions,
   ChevronUp,
   Maximize,
   Minimize,
+  PanelTopClose,
   Settings,
   SkipForward,
   Volume2,
@@ -23,10 +25,12 @@ interface ControlsProps {
   page?: PanelPage
   panelId: string
   fullscreen: boolean
+  windowFullscreen: boolean
   onScrub: (time?: number) => void
   onPlay: () => void
   onNextEpisode?: () => void
   onFullscreen: () => void
+  onWindowFullscreen: () => void
   onPanel: (page: 'chapters' | 'settings', trigger: HTMLButtonElement) => void
 }
 
@@ -39,10 +43,12 @@ export function PlayerControls({
   page,
   panelId,
   fullscreen,
+  windowFullscreen,
   onScrub,
   onPlay,
   onNextEpisode,
   onFullscreen,
+  onWindowFullscreen,
   onPanel,
 }: ControlsProps) {
   const text = usePlayerText()
@@ -51,6 +57,10 @@ export function PlayerControls({
   const { status, busy, volume, captions, selectedSubtitle } = playback
   const VolumeIcon = volume > 0 ? Volume2 : VolumeX
   const FullscreenIcon = fullscreen ? Minimize : Maximize
+  const WindowFullscreenIcon = windowFullscreen ? PanelTopClose : AppWindow
+  const windowFullscreenLabel = windowFullscreen
+    ? labels.exitWindowFullscreen
+    : labels.windowFullscreen
   const settingsOpen = page !== undefined && page !== 'chapters'
   const timeDisplay = live ? (
     labels.live
@@ -157,6 +167,15 @@ export function PlayerControls({
             <Settings aria-hidden="true" />
           </button>
         </div>
+        <button
+          className="lmp-button"
+          type="button"
+          aria-label={windowFullscreenLabel}
+          title={windowFullscreenLabel}
+          onClick={onWindowFullscreen}
+        >
+          <WindowFullscreenIcon aria-hidden="true" />
+        </button>
         <button
           className="lmp-button"
           type="button"

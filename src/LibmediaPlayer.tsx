@@ -25,6 +25,8 @@ import type {
 } from './player-api'
 import { usePlayback } from './usePlayback'
 
+type FullscreenMode = 'native' | 'window'
+
 export type {
   BitmapSubtitleFormat,
   ExternalSubtitleTrack,
@@ -200,11 +202,13 @@ function Playback({
   const shortcut =
     useRef<(event: KeyboardEvent, byPointer: boolean) => void>(null)
   const hideTimer = useRef<number>(undefined)
+  const fullscreenPending = useRef(false)
   const [idle, setIdle] = useState(false)
   const [page, setPage] = useState<PanelPage>('settings')
   const [panelOpen, setPanelOpen] = useState(false)
   const [nativeFullscreen, setNativeFullscreen] = useState(false)
-  const [pageFullscreen, setPageFullscreen] = useState(false)
+  const [pageFullscreenMode, setPageFullscreenMode] = useState<FullscreenMode>()
+  const pageFullscreen = pageFullscreenMode !== undefined
   const [fullscreenError, setFullscreenError] = useState<
     'fullscreenFailed' | 'exitFullscreenFailed'
   >()
@@ -218,7 +222,7 @@ function Playback({
   )
   const playing = status === 'playing'
   const loaded = media && status !== 'error'
-  if (status === 'error' && pageFullscreen) setPageFullscreen(false)
+  if (status === 'error' && pageFullscreen) setPageFullscreenMode(undefined)
   const holdControls = !playing || panelOpen || scrub !== undefined
   if (holdControls && idle) setIdle(false)
   const visible = holdControls || !idle
@@ -302,26 +306,33 @@ function Playback({
     setPanelOpen(true)
   }
 
-  async function toggleFullscreen() {
+  async function toggleFullscreen(mode: FullscreenMode = 'native') {
+    const player = root.current
+    if (!player || fullscreenPending.current) return
+    const { ownerDocument } = player
     setFullscreenError(undefined)
-    if (pageFullscreen) {
-      setPageFullscreen(false)
+    if (pageFullscreenMode === mode) {
+      setPageFullscreenMode(undefined)
       return
     }
 
-    const player = root.current
-    if (!player) return
+    fullscreenPending.current = true
     try {
-      if (player.ownerDocument.fullscreenElement === player)
-        await player.ownerDocument.exitFullscreen()
-      else if (
-        player.ownerDocument.fullscreenEnabled &&
+      if (ownerDocument.fullscreenElement === player) {
+        await ownerDocument.exitFullscreen()
+        if (mode === 'window') setPageFullscreenMode(mode)
+      } else if (
+        mode === 'native' &&
+        ownerDocument.fullscreenEnabled &&
         typeof player.requestFullscreen === 'function'
-      )
+      ) {
         await player.requestFullscreen()
-      else setPageFullscreen(true)
+        setPageFullscreenMode(undefined)
+      } else setPageFullscreenMode(mode)
     } catch {
       setFullscreenError('fullscreenFailed')
+    } finally {
+      fullscreenPending.current = false
     }
   }
 
@@ -331,7 +342,7 @@ function Playback({
     if (!onNextEpisode || nextEpisodePending.current) return
     nextEpisodePending.current = true
     setFullscreenError(undefined)
-    setPageFullscreen(false)
+    setPageFullscreenMode(undefined)
     // Begin exiting fullscreen before pausing so the host chooser is visible.
     const exited = document.fullscreenElement
       ? document.exitFullscreen().catch(() => {
@@ -363,7 +374,7 @@ function Playback({
         event.preventDefault()
         event.stopPropagation()
         if (panelOpen) closePanel()
-        else setPageFullscreen(false)
+        else setPageFullscreenMode(undefined)
         return
       }
 
@@ -565,11 +576,13 @@ function Playback({
               chapterIndex={chapterIndex}
               page={panelOpen ? page : undefined}
               panelId={panelId}
-              fullscreen={nativeFullscreen || pageFullscreen}
+              fullscreen={nativeFullscreen || pageFullscreenMode === 'native'}
+              windowFullscreen={pageFullscreenMode === 'window'}
               onPlay={play}
               onNextEpisode={onNextEpisode ? openNextEpisode : undefined}
               onScrub={setScrub}
-              onFullscreen={toggleFullscreen}
+              onFullscreen={() => toggleFullscreen()}
+              onWindowFullscreen={() => toggleFullscreen('window')}
               onPanel={handlePanel}
             />
             <PlayerPanel

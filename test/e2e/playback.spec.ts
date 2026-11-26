@@ -120,6 +120,69 @@ test('renders the preferred external SRT track during real playback', async ({
   await expect(page.getByTestId('errors')).toHaveText('[]')
 })
 
+test('offers separate window and browser fullscreen controls', async ({
+  page,
+}) => {
+  await page.goto('/test/e2e/')
+  const player = page.getByRole('region', { name: 'Video player' })
+  const stage = player.locator('.lmp-stage')
+  const fullscreen = player.getByRole('button', {
+    name: 'Fullscreen',
+    exact: true,
+  })
+  const exitFullscreen = player.getByRole('button', {
+    name: 'Exit fullscreen',
+    exact: true,
+  })
+  const windowFullscreen = player.getByRole('button', {
+    name: 'Window fullscreen',
+    exact: true,
+  })
+  const exitWindowFullscreen = player.getByRole('button', {
+    name: 'Exit window fullscreen',
+  })
+  const nativeFullscreenActive = () =>
+    player.evaluate((element) => element === document.fullscreenElement)
+
+  await expect(fullscreen).toBeVisible()
+  await expect(windowFullscreen).toBeVisible()
+  const embedded = await stage.boundingBox()
+
+  await windowFullscreen.click()
+  await expect(exitWindowFullscreen).toBeVisible()
+  expect(await page.evaluate(() => document.fullscreenElement)).toBeNull()
+  expect(await stage.boundingBox()).toEqual({
+    x: 0,
+    y: 0,
+    ...page.viewportSize(),
+  })
+
+  await page.keyboard.press('Escape')
+  await expect(windowFullscreen).toBeVisible()
+  expect(await stage.boundingBox()).toEqual(embedded)
+
+  await player.focus()
+  await page.keyboard.press('f')
+  await expect(exitFullscreen).toBeVisible()
+  expect(await nativeFullscreenActive()).toBe(true)
+
+  await windowFullscreen.click()
+  await expect(exitWindowFullscreen).toBeVisible()
+  expect(await page.evaluate(() => document.fullscreenElement)).toBeNull()
+
+  await fullscreen.click()
+  await expect(exitFullscreen).toBeVisible()
+  expect(await nativeFullscreenActive()).toBe(true)
+  await expect(windowFullscreen).toBeVisible()
+
+  await exitFullscreen.click()
+  await expect(fullscreen).toBeVisible()
+  await windowFullscreen.click()
+  await exitWindowFullscreen.click()
+  await expect(windowFullscreen).toBeVisible()
+  expect(await stage.boundingBox()).toEqual(embedded)
+})
+
 test.describe('touch controls', () => {
   test.use({ hasTouch: true, viewport: { width: 390, height: 844 } })
 

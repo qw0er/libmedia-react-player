@@ -122,10 +122,11 @@ Use `sourceFormat` when the URL has no file extension. The player applies `media
 | `ref`                        | `Ref<LibmediaPlayerHandle>` for playback commands                                  |
 
 The player defaults to full container width and a 16:9 ratio. Use `className`
-for responsive layout or `style` for a local override. The fullscreen button uses
-browser fullscreen where available. On iPhone Safari and other browsers without
-element fullscreen, it expands the player to the visible page viewport, including
-its subtitles and controls. The browser toolbar remains under browser control.
+for responsive layout or `style` for a local override. The **Window fullscreen**
+button fills the visible page viewport while keeping the browser toolbar visible.
+Press **Esc** or select the same button to return to the embedded size. The
+**Fullscreen** button and **F** use browser fullscreen where available and fall
+back to the page viewport on browsers without element fullscreen.
 
 The host owns the next-episode chooser. Activating the button pauses playback
 and exits fullscreen before `onNextEpisode` runs, so a chooser portaled to
