@@ -3,6 +3,14 @@
 All notable changes to libmedia-react-player are documented here. Release dates
 and changes are based on the corresponding Git tags and commits.
 
+## [1.5.1] - 2026-11-26
+
+### Fixed
+
+- Started the control and cursor auto-hide timer whenever playback resumes or
+  controls are released (including programmatic `play()`, source changes,
+  closing a panel via blur, and finishing a timeline scrub).
+
 ## [1.5.0] - 2026-11-23
 
 ### Added
@@ -107,6 +115,7 @@ and changes are based on the corresponding Git tags and commits.
   subtitles, a timeline, loading and buffering indicators, and keyboard controls.
 - Added playback commands and events for host applications.
 
+[1.5.1]: https://github.com/qw0er/libmedia-react-player/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/qw0er/libmedia-react-player/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/qw0er/libmedia-react-player/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/qw0er/libmedia-react-player/compare/v1.4.0...v1.4.1
