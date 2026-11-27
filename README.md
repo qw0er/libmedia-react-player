@@ -344,5 +344,10 @@ ffmpeg -y -f lavfi -i 'testsrc2=size=160x90:rate=10:duration=12' \
 
 ## License
 
-- Project code — [LGPL-3.0-or-later](LICENSE)
-- Bundled AVPlayer and SIMD decoders — [libmedia fork pinned in `deps/libmedia`](https://github.com/qw0er/libmedia)
+Project source code is subject to the [Mozilla Public License, version 2.0](LICENSE).
+
+Bundled AVPlayer and SIMD decoders come from the [libmedia fork pinned in
+`deps/libmedia`](https://github.com/qw0er/libmedia) and retain their own licenses.
+libmedia is licensed under [LGPL-3.0-or-later](LICENSE-LGPL-3.0); see its
+repository for details of its dependencies. The LGPL incorporates the
+[GNU General Public License, version 3](LICENSE-GPL-3.0).
