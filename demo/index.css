@@ -247,6 +247,12 @@ body {
   resize: vertical;
 }
 
+.chooser li button {
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
 .workspace button:not(.stage *) {
   cursor: pointer;
   background: var(--button-bg);
@@ -359,12 +365,6 @@ body {
   margin-top: 0.75rem;
   gap: 0.5rem;
   overflow: auto;
-}
-
-.chooser li button {
-  width: 100%;
-  text-align: left;
-  overflow-wrap: anywhere;
 }
 
 @media (min-width: 40rem) {
