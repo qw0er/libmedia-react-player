@@ -160,7 +160,7 @@ export function SourceForm({
           }}
         />
       </label>
-      {file && <p className="muted break-all">{file.name}</p>}
+      {file && <p className="muted file-name">{file.name}</p>}
 
       <details>
         <summary>Start position and audio</summary>
