@@ -3,6 +3,12 @@
 All notable changes to libmedia-react-player are documented here. Release dates
 and changes are based on the corresponding Git tags and commits.
 
+## [1.6.3] - 2026-11-28
+
+### Fixed
+
+- Prevented control focus from blocking auto-hide after seeking.
+
 ## [1.6.2] - 2026-11-28
 
 ### Changed
