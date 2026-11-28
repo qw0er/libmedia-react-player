@@ -3,6 +3,24 @@
 All notable changes to libmedia-react-player are documented here. Release dates
 and changes are based on the corresponding Git tags and commits.
 
+## [1.6.2] - 2026-11-28
+
+### Changed
+
+- Migrated the demo to plain CSS, removed unused dependencies, and updated
+  project dependencies.
+- Updated `deps/libmedia`.
+
+### Fixed
+
+- Classified network failures accurately and localized failure messages.
+
+## [1.6.1] - 2026-11-27
+
+### Changed
+
+- Switched the project license to MPL-2.0.
+
 ## [1.6.0] - 2026-11-26
 
 ### Added
