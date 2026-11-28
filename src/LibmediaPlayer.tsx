@@ -293,7 +293,11 @@ function Playback({
     }
   }
 
-  function closePanel() {
+  function closePanel(restoreFocus = true) {
+    if (!restoreFocus) {
+      panelTrigger.current = null
+      stage.current?.focus({ preventScroll: true })
+    }
     setPanelOpen(false)
     revealControls()
   }
@@ -408,6 +412,14 @@ function Playback({
       else return
       event.preventDefault()
       event.stopPropagation()
+      const active = root.current?.ownerDocument.activeElement
+      if (
+        byPointer &&
+        active instanceof HTMLElement &&
+        active.closest('.lmp-controls, .lmp-center-controls')
+      ) {
+        stage.current?.focus({ preventScroll: true })
+      }
       revealControls()
     }
   })

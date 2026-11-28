@@ -564,3 +564,105 @@ it('starts the auto-hide timer whenever controls are released during playback', 
     vi.useRealTimers()
   }
 })
+
+it('moves focus out of controls on pointer-scoped seek shortcuts so slow seeks still auto-hide', async () => {
+  const user = userEvent.setup()
+  const ref = createRef<LibmediaPlayerHandle>()
+  let resolveSeek!: (position: bigint) => void
+  vi.spyOn(TestPlayerRuntime.prototype, 'seek').mockImplementationOnce(
+    () =>
+      new Promise<bigint>((resolve) => {
+        resolveSeek = resolve
+      }),
+  )
+  render(<LibmediaPlayer ref={ref} src={source} />)
+  const player = await readyPlayer()
+  await act(async () => {
+    await ref.current?.play()
+  })
+
+  await user.click(within(player).getByRole('button', { name: 'Mute' }))
+  const unmute = within(player).getByRole('button', { name: 'Unmute' })
+  expect(document.activeElement).toBe(unmute)
+
+  vi.useFakeTimers()
+  try {
+    fireEvent.keyDown(unmute, { key: 'ArrowRight' })
+    const stage = player.querySelector<HTMLElement>('.lmp-stage')
+    expect(document.activeElement).toBe(stage)
+
+    act(() => {
+      vi.advanceTimersByTime(2600)
+    })
+    expect(player.dataset.visible).toBe('false')
+
+    await act(async () => {
+      resolveSeek(5000n)
+      await Promise.resolve()
+    })
+    expect(player.dataset.visible).toBe('false')
+    expect(document.activeElement).toBe(stage)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('does not return focus to controls after a chapter jump so slow seeks still auto-hide', async () => {
+  const ref = createRef<LibmediaPlayerHandle>()
+  let resolveSeek!: (position: bigint) => void
+  vi.spyOn(TestPlayerRuntime.prototype, 'load').mockImplementationOnce(
+    async function (this: TestPlayerRuntime) {
+      Object.assign(this, {
+        getChapters: () => [
+          {
+            start: 0n,
+            timeBase: { num: 1, den: 1000 },
+            metadata: { title: 'Opening' },
+          },
+          {
+            start: 5000n,
+            timeBase: { num: 1, den: 1000 },
+            metadata: { title: 'Main' },
+          },
+        ],
+      })
+    },
+  )
+  vi.spyOn(TestPlayerRuntime.prototype, 'seek').mockImplementationOnce(
+    () =>
+      new Promise<bigint>((resolve) => {
+        resolveSeek = resolve
+      }),
+  )
+
+  render(<LibmediaPlayer ref={ref} src={source} />)
+  const player = await readyPlayer()
+  vi.useFakeTimers()
+  try {
+    await act(async () => {
+      await ref.current?.play()
+    })
+
+    fireEvent.click(within(player).getByRole('button', { name: 'Chapters' }))
+    expect(player.dataset.panelOpen).toBe('true')
+    fireEvent.click(within(player).getByRole('button', { name: /Main/ }))
+
+    const stage = player.querySelector<HTMLElement>('.lmp-stage')
+    expect(player.dataset.panelOpen).toBe('false')
+    expect(document.activeElement).toBe(stage)
+
+    act(() => {
+      vi.advanceTimersByTime(2600)
+    })
+    expect(player.dataset.visible).toBe('false')
+
+    await act(async () => {
+      resolveSeek(5000n)
+      await Promise.resolve()
+    })
+    expect(player.dataset.visible).toBe('false')
+    expect(document.activeElement).toBe(stage)
+  } finally {
+    vi.useRealTimers()
+  }
+})

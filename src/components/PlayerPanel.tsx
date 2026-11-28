@@ -19,7 +19,7 @@ interface PanelProps {
   media: MediaInfo
   chapterIndex: number
   onPage: (page: PanelPage) => void
-  onClose: () => void
+  onClose: (restoreFocus?: boolean) => void
 }
 
 export function PlayerPanel({
@@ -65,7 +65,7 @@ export function PlayerPanel({
     const chapter = media.chapters[index]
     if (!chapter || playback.busy) return
     playback.seek(chapter.start)
-    onClose()
+    onClose(false)
   }
 
   return (
@@ -77,7 +77,7 @@ export function PlayerPanel({
         tabIndex={-1}
         inert={!open}
         data-open={open}
-        onClick={onClose}
+        onClick={() => onClose(false)}
       />
       <section
         className="lmp-panel"
@@ -134,7 +134,7 @@ export function PlayerPanel({
             className="lmp-button"
             type="button"
             aria-label={labels.closeMenu}
-            onClick={onClose}
+            onClick={() => onClose()}
           >
             <X aria-hidden="true" />
           </button>
