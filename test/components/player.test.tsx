@@ -194,15 +194,17 @@ it('localizes the failure overlay without retrying or changing the reported erro
   )
   const props = { ref, src: source, onError }
   const { rerender } = render(<LibmediaPlayer {...props} />)
-  expect((await screen.findByRole('alert')).textContent).toBe(
-    'Playback failed. Check the video URL and browser compatibility.',
+  await waitFor(() =>
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Authentication is required to play this video.',
+    ),
   )
   const sessionId = ref.current?.getSnapshot().sessionId
   expect(sessionId).toBeTruthy()
 
   rerender(<LibmediaPlayer {...props} locale="zh-CN" />)
   expect(screen.getByRole('alert').textContent).toBe(
-    '播放失败，请检查视频链接和浏览器兼容性。',
+    '需要身份验证才能播放此视频。',
   )
   expect(ref.current?.getSnapshot()).toMatchObject({
     sessionId,
@@ -218,6 +220,32 @@ it('localizes the failure overlay without retrying or changing the reported erro
         message: 'Could not load the video.',
       }),
     ),
+  )
+})
+
+it('reports network failures accurately when the diagnostic range probe still returns 206', async () => {
+  const onError = vi.fn()
+  vi.spyOn(TestPlayerRuntime.prototype, 'load').mockRejectedValueOnce(
+    new Error('open stream failed, ret: -1048573'),
+  )
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(new Response(null, { status: 206 })),
+  )
+
+  render(<LibmediaPlayer src={source} locale="zh-CN" onError={onError} />)
+  await waitFor(() =>
+    expect(screen.getByRole('alert').textContent).toBe(
+      '网络连接异常或不稳定，请检查网络后重试。',
+    ),
+  )
+  expect(onError).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      operation: 'load',
+      reason: 'network',
+      httpStatus: 206,
+      fatal: true,
+    }),
   )
 })
 

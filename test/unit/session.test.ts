@@ -30,6 +30,7 @@ it('ignores a disposed session whose runtime is still loading', async () => {
     'disposed-session',
     {
       setStatus: vi.fn(),
+      setErrorReason: vi.fn(),
       setPosition: vi.fn(),
       setNotice: vi.fn(),
       setTracks: vi.fn(),

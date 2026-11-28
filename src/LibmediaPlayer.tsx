@@ -17,7 +17,11 @@ import {
   usePlayerText,
 } from './components/player-ui'
 import { StyledSubtitles } from './components/StyledSubtitles'
-import { formatPlaybackNotice, playerLocales } from './locales'
+import {
+  formatPlaybackFailure,
+  formatPlaybackNotice,
+  playerLocales,
+} from './locales'
 import styles from './player.css?inline'
 import type {
   LibmediaPlaybackPreferences,
@@ -185,6 +189,7 @@ function Playback({
   const {
     media,
     status,
+    errorReason,
     position,
     busy,
     notice,
@@ -541,7 +546,7 @@ function Playback({
 
         {status === 'error' && (
           <div className="lmp-message" role="alert">
-            {text.playbackFailed}
+            {formatPlaybackFailure(text, errorReason)}
           </div>
         )}
 

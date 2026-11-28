@@ -1,4 +1,8 @@
-import type { LibmediaControlLabels, LibmediaLocale } from './player-api'
+import type {
+  LibmediaControlLabels,
+  LibmediaErrorReason,
+  LibmediaLocale,
+} from './player-api'
 
 const en = {
   labels: {
@@ -62,8 +66,18 @@ const en = {
       'Could not render styled subtitles. Using libmedia subtitles for this track.',
     initialPositionFailed: 'Could not restore the initial position.',
   },
-  playbackFailed:
-    'Playback failed. Check the video URL and browser compatibility.',
+  playbackFailed: 'Playback failed.',
+  failureReasons: {
+    network:
+      'Playback failed due to a network error. Check your connection and try again.',
+    server: 'The video server is temporarily unavailable. Try again later.',
+    credentials: 'Authentication is required to play this video.',
+    forbidden: 'Access to this video was denied.',
+    'not-found': 'The video could not be found.',
+    unavailable: 'The video is currently unavailable.',
+    engine: 'Playback failed. The video format or codec may not be supported.',
+    unknown: 'Playback failed.',
+  } satisfies Record<Exclude<LibmediaErrorReason, 'aborted'>, string>,
   fullscreenFailed: 'Could not enter or exit fullscreen.',
   exitFullscreenFailed: 'Could not exit fullscreen.',
   audioTrack: (number: number) => `Audio ${number}`,
@@ -137,7 +151,17 @@ const zhCN = {
     styledSubtitleFallback: '无法渲染样式字幕，已改用 libmedia 渲染此字幕轨。',
     initialPositionFailed: '无法恢复初始播放位置。',
   },
-  playbackFailed: '播放失败，请检查视频链接和浏览器兼容性。',
+  playbackFailed: '播放失败。',
+  failureReasons: {
+    network: '网络连接异常或不稳定，请检查网络后重试。',
+    server: '视频服务暂时不可用，请稍后重试。',
+    credentials: '需要身份验证才能播放此视频。',
+    forbidden: '没有权限访问此视频。',
+    'not-found': '找不到该视频资源。',
+    unavailable: '该视频当前不可用。',
+    engine: '无法播放此视频，当前格式或编码可能不受支持。',
+    unknown: '播放失败。',
+  },
   fullscreenFailed: '无法进入或退出全屏。',
   exitFullscreenFailed: '无法退出全屏。',
   audioTrack: (number) => `音轨 ${number}`,
@@ -155,6 +179,14 @@ export const playerLocales: Record<LibmediaLocale, PlayerLocaleText> = {
 export type PlaybackNotice =
   | keyof PlayerLocaleText['notices']
   | { externalSubtitleTrack: number }
+
+export function formatPlaybackFailure(
+  text: PlayerLocaleText,
+  reason: LibmediaErrorReason | undefined,
+) {
+  if (!reason || reason === 'aborted') return text.playbackFailed
+  return text.failureReasons[reason]
+}
 
 export function formatPlaybackNotice(
   text: PlayerLocaleText,

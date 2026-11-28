@@ -40,7 +40,7 @@ export class TestPlayerRuntime {
   private selectedAudio = audio.id
   private selectedSubtitle = subtitle.id
   private streams = [video, audio, subtitle]
-  private events = new Map<string, () => void>()
+  private events = new Map<string, (...args: unknown[]) => void>()
   private options: {
     findBestStream: (streams: Stream[], mediaType: number) => Stream | undefined
   }
@@ -49,7 +49,7 @@ export class TestPlayerRuntime {
     this.options = options
   }
 
-  on(event: string, callback: () => void) {
+  on(event: string, callback: (...args: unknown[]) => void) {
     this.events.set(event, callback)
     return this
   }

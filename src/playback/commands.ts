@@ -57,7 +57,9 @@ export function createPlaybackCommands(
           throw error
         }
         const detail =
-          operation === 'seek' ? await current.classifyFailure() : undefined
+          operation === 'seek'
+            ? await current.classifyFailure('seek', error)
+            : undefined
         current.signal.throwIfAborted()
         if (current.status === 'error') throw new Error(message)
         current.reportError(operation, notice, fatal, detail)

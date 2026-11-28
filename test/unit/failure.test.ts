@@ -95,4 +95,87 @@ describe('describeFailure', () => {
       expect(fetch).not.toHaveBeenCalled()
     },
   )
+
+  it.each([
+    [
+      'IOError.NETWORK_ERROR on load',
+      new Error('open stream failed, ret: -1048573'),
+    ],
+    [
+      'IOError.NETWORK_ERROR on demux',
+      new Error('demux error, code: -1048573'),
+    ],
+    ['Early-EOF error', new Error('Fetch stream meet Early-EOF')],
+    ['fetch TypeError', new TypeError('Failed to fetch')],
+    ['TimeoutError', new DOMException('Timed out', 'TimeoutError')],
+  ])(
+    'classifies %s as network even when the 1-byte probe returns 206',
+    async (_, error) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response(null, { status: 206 })),
+      )
+
+      await expect(
+        describeFailure(source, undefined, new AbortController().signal, {
+          operation: 'playback',
+          error,
+        }),
+      ).resolves.toEqual({
+        reason: 'network',
+        httpStatus: 206,
+      })
+    },
+  )
+
+  it('still prioritizes HTTP 401/503 over an engine IOError.NETWORK_ERROR', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 401 })),
+    )
+
+    await expect(
+      describeFailure(source, undefined, new AbortController().signal, {
+        operation: 'load',
+        error: new Error('open stream failed, ret: -1048573'),
+      }),
+    ).resolves.toEqual({
+      reason: 'credentials',
+      httpStatus: 401,
+    })
+  })
+
+  it('keeps genuine format errors as engine when the probe returns 206', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 206 })),
+    )
+
+    await expect(
+      describeFailure(source, undefined, new AbortController().signal, {
+        operation: 'load',
+        error: new Error('open stream failed, ret: -1'),
+      }),
+    ).resolves.toEqual({
+      reason: 'engine',
+      httpStatus: 206,
+    })
+  })
+
+  it('classifies a rejected seek with a 206 probe as network unless format is unsupported', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(null, { status: 206 })),
+    )
+
+    await expect(
+      describeFailure(source, undefined, new AbortController().signal, {
+        operation: 'seek',
+        error: new Error('The media seek failed.'),
+      }),
+    ).resolves.toEqual({
+      reason: 'network',
+      httpStatus: 206,
+    })
+  })
 })

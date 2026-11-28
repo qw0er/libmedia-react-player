@@ -19,6 +19,7 @@ import type { TrackSelection } from './playback/tracks'
 import type {
   ExternalSubtitleTrack,
   LibmediaAudioSelection,
+  LibmediaErrorReason,
   LibmediaPlaybackPreferences,
   LibmediaPlaybackSnapshot,
   LibmediaPlaybackStatus,
@@ -65,6 +66,7 @@ export function usePlayback(
   })
   const [restart, setRestart] = useState<Restart>()
   const [status, setStatus] = useState<LibmediaPlaybackStatus>('loading')
+  const [errorReason, setErrorReason] = useState<LibmediaErrorReason>()
   const [media, setMedia] = useState<MediaInfo>()
   const [position, setPosition] = useState(0)
   const [pendingSeek, setPendingSeek] = useState<number>()
@@ -123,6 +125,7 @@ export function usePlayback(
       attemptId,
       {
         setStatus,
+        setErrorReason,
         setPosition,
         setNotice,
         setTracks,
@@ -172,6 +175,7 @@ export function usePlayback(
         ? latest.current.position
         : (initialPositionMs ?? 0)
       setStatus('loading')
+      setErrorReason(undefined)
       setMedia(undefined)
       setNotice(undefined)
       setPendingSeek(undefined)
@@ -251,6 +255,7 @@ export function usePlayback(
     getSnapshot,
     getMediaDetails,
     status,
+    errorReason,
     media,
     buffered,
     buffering,
